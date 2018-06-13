@@ -3,27 +3,27 @@
 
 V8Context::V8Context(const char* flags)
 {
-    fprintf(stderr, "V8 construct\n");
+    // fprintf(stderr, "V8 construct\n");
     V8Context::initialize_v8();
 
     // Create a new Isolate and make it the current one.
     create_params.array_buffer_allocator =
         v8::ArrayBuffer::Allocator::NewDefaultAllocator();
-    fprintf(stderr, "V8 created allocator\n");
+    // fprintf(stderr, "V8 created allocator\n");
     isolate = v8::Isolate::New(create_params);
-    fprintf(stderr, "V8 created isolate\n");
-    fprintf(stderr, "V8 construct done\n");
+    // fprintf(stderr, "V8 created isolate\n");
+    // fprintf(stderr, "V8 construct done\n");
 }
 
 V8Context::~V8Context()
 {
-    fprintf(stderr, "V8 destruct\n");
+    // fprintf(stderr, "V8 destruct\n");
     delete create_params.array_buffer_allocator;
     V8Context::terminate_v8();
-    fprintf(stderr, "V8 destruct done\n");
+    // fprintf(stderr, "V8 destruct done\n");
 }
 
-int V8Context::run(const char* code)
+int V8Context::eval(const char* code, const char* file)
 {
     v8::Isolate::Scope isolate_scope(isolate);
 
@@ -54,28 +54,23 @@ int V8Context::run(const char* code)
     return 0;
 }
 
-void V8Context::set_flags_from_string(const char *str)
-{
-    v8::V8::SetFlagsFromString(str, strlen(str));
-}
-
 void V8Context::initialize_v8()
 {
-    fprintf(stderr, "V8 initializing\n");
+    // fprintf(stderr, "V8 initializing\n");
     const char* prog = "foo";
     v8::V8::InitializeICUDefaultLocation(prog);
     v8::V8::InitializeExternalStartupData(prog);
     platform = v8::platform::NewDefaultPlatform();
     v8::V8::InitializePlatform(platform.get());
     v8::V8::Initialize();
-    fprintf(stderr, "V8 initializing done\n");
+    // fprintf(stderr, "V8 initializing done\n");
 }
 
 void V8Context::terminate_v8()
 {
-    fprintf(stderr, "V8 terminating\n");
+    // fprintf(stderr, "V8 terminating\n");
     isolate->Dispose();
     v8::V8::Dispose();
     v8::V8::ShutdownPlatform();
-    fprintf(stderr, "V8 terminating done\n");
+    // fprintf(stderr, "V8 terminating done\n");
 }

@@ -30,9 +30,8 @@ class V8Context {
         V8Context(const char* flags = NULL);
         ~V8Context();
 
-        int run(const char* code);
+        int eval(const char* code, const char* file = 0);
 
-        void set_flags_from_string(const char *str);
     private:
         void initialize_v8();
         void terminate_v8();
