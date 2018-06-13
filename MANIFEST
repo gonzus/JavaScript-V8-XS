@@ -1,0 +1,13 @@
+.gitignore
+Changes
+JavaScript-V8-XS-Context.xsp
+MANIFEST
+Makefile.PL
+V8Context.cc
+V8Context.h
+v8-perl.xs
+lib/JavaScript/V8/XS.pm
+perlobject.map
+ppport.h
+typemap
+typemap.xsp

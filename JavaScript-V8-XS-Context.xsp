@@ -1,0 +1,9 @@
+%module{JavaScript::V8::XS};
+
+%name{JavaScript::V8::XS} class V8Context
+{
+  V8Context(const char* flags = 0);
+  ~V8Context();
+
+  void set_flags_from_string(const char *str);
+};
