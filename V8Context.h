@@ -12,15 +12,34 @@ extern "C" {
 }
 #endif
 
+#ifdef New
+#undef New
+#endif
+#ifdef Null
+#undef Null
+#endif
+#ifdef do_open
+#undef do_open
+#endif
+#ifdef do_close
+#undef do_close
+#endif
+
 class V8Context {
     public:
         V8Context(const char* flags = NULL);
         ~V8Context();
 
+        int run(const char* code);
+
         void set_flags_from_string(const char *str);
     private:
-        static int v8_initialized;
-        static void initialize_v8();
+        void initialize_v8();
+        void terminate_v8();
+
+        std::unique_ptr<v8::Platform> platform;
+        v8::Isolate::CreateParams create_params;
+        v8::Isolate* isolate;
 };
 
 #endif

@@ -5,5 +5,6 @@
   V8Context(const char* flags = 0);
   ~V8Context();
 
+  int run(const char* code);
   void set_flags_from_string(const char *str);
 };
