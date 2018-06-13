@@ -1,0 +1,23 @@
+* Figure out how to use installed V8 includes / libraries.
+
+* It is also necessary to specify the location of dynamic libraries at runtime
+  using LD_LIBRARY_PATH.  For example:
+
+    make && \
+    LD_LIBRARY_PATH=~/src/v8/out.gn/x64.release \
+    perl -I blib/lib/ -I blib/arch/ -MJavaScript::V8::XS \
+    -E'my $v8 = JavaScript::V8::XS->new(); $v8->run(q[let x=3+8; "Hi "+x]);'
+
+* Figure out what to do with bin files, which are required:
+
+     64K natives_blob.bin
+    592K snapshot_blob.bin
+    564K snapshot_blob_trusted.bin (only when running trusted code?)
+
+  When not present, the errors are:
+    Failed to open startup resource 'natives_blob.bin'.
+    Failed to open startup resource 'snapshot_blob.bin'.
+
+* Figure out what to do with dat files, which are required:
+
+    9.8M icudtl.dat (only when using ICU?)

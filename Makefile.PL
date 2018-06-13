@@ -7,7 +7,7 @@ my $V8_LIB = "$V8_ROOT/out.gn/x64.release";
 my @V8_LIBS = qw/ v8 v8_libbase v8_libplatform icuuc icui18n /;
 
 my $CC = 'c++';
-my $CC_OPTS = '--std=c++0x -Wreserved-user-defined-literal';
+my $CC_OPTS = '--std=c++11';
 my $LD = 'c++';
 my $LD_OPTS = "-L${V8_LIB} " . join(' ', map { "-l$_" } @V8_LIBS);
 
@@ -19,26 +19,31 @@ WriteMakefile(
     MIN_PERL_VERSION => 5.018000,
     PREREQ_PM      => {
         'ExtUtils::XSpp' => '0.11',
-        # 'XSLoader'     => 0,
+        'XSLoader'       => 0,
     },
     TEST_REQUIRES  => {
-        'Data::Dumper' => 0,
-        'Test::More'   => 0,
+        'Data::Dumper'   => 0,
+        'Test::More'     => 0,
     },
     AUTHOR         => [
         'Gonzalo Diethelm (gonzus@cpan.org)',
     ],
 
+    # compiler settings
     CC                 => "$CC $CC_OPTS",
     DEFINE             => '',
     INC                => "-I $V8_INCLUDE",
+    depend             => { 'v8-perl.c' => 'JavaScript-V8-XS-Context.xsp' },
 
+    # linker settings
     LD                 => "$LD $LD_OPTS",
     OBJECT             => '$(O_FILES)',
 
+    # precompiler settings
     XSOPT              => '-C++ -hiertype',
-    TYPEMAPS           => ['perlobject.map'], # TODO
-    depend             => { 'v8-perl.c' => 'JavaScript-V8-XS-Context.xsp' },
+    TYPEMAPS           => ['perlobject.map'],
+
+    # repo settings
     META_MERGE         => {
         'meta-spec'    => { version => 2 },
         resources      => {
