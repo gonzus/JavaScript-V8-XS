@@ -24,6 +24,9 @@ extern "C" {
 #ifdef do_close
 #undef do_close
 #endif
+#ifdef IsSet
+#undef IsSet
+#endif
 
 class V8Context {
     public:
@@ -35,6 +38,9 @@ class V8Context {
     private:
         void initialize_v8();
         void terminate_v8();
+        v8::Handle<v8::Array> CreateArray(int nested);
+        v8::Handle<v8::Object> CreateObject(int nested);
+        void DumpObject(const v8::Handle<v8::Object>& object, int level = 0);
 
         std::unique_ptr<v8::Platform> platform;
         v8::Isolate::CreateParams create_params;
