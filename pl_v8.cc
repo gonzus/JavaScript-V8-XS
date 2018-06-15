@@ -394,9 +394,14 @@ SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name)
     int last_dot = find_last_dot(name, &len);
     if (last_dot < 0) {
         Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name, NewStringType::kNormal).ToLocalChecked();
-        Local<Value> value = context->Global()->Get(v8_name);
-        Handle<Object> object = Local<Object>::Cast(value);
-        ret = pl_v8_to_perl(aTHX_ ctx, object);
+        if (context->Global()->Has(v8_name)) {
+            Local<Value> value = context->Global()->Get(v8_name);
+            Handle<Object> object = Local<Object>::Cast(value);
+            ret = pl_v8_to_perl(aTHX_ ctx, object);
+        }
+        else {
+            fprintf(stderr, "SYMBOL [%s] MISSING\n", name);
+        }
     } else {
         // TODO
     }
