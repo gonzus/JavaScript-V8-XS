@@ -1,3 +1,4 @@
+#include "pl_v8.h"
 #include "V8Context.h"
 
 /* We need one MODULE... line to start the actual XS section of the file.

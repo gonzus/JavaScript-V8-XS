@@ -2,49 +2,34 @@
 #define V8CONTEXT_H_
 
 #include <v8.h>
+#include "pl_config.h"
+#include "pl_v8.h"
 
-#ifdef __cplusplus
-extern "C" {
-#include <EXTERN.h>
-#include <perl.h>
-#include <XSUB.h>
-#include "ppport.h"
-}
-#endif
-
-#ifdef New
-#undef New
-#endif
-#ifdef Null
-#undef Null
-#endif
-#ifdef do_open
-#undef do_open
-#endif
-#ifdef do_close
-#undef do_close
-#endif
-#ifdef IsSet
-#undef IsSet
-#endif
+using namespace v8;
 
 class V8Context {
     public:
         V8Context(const char* flags = NULL);
         ~V8Context();
 
+        SV* get(const char* name);
+        void set(const char* name, SV* value);
+
         int eval(const char* code, const char* file = 0);
 
+        Isolate* isolate;
+        Persistent<Context> persistent_context;
+
+        static uint64_t GetTypeFlags(const Local<Value>& v);
     private:
         void initialize_v8();
         void terminate_v8();
-        v8::Handle<v8::Array> CreateArray(int nested);
-        v8::Handle<v8::Object> CreateObject(int nested);
-        void DumpObject(const v8::Handle<v8::Object>& object, int level = 0);
+        Handle<Array> CreateArray(int nested);
+        Handle<Object> CreateObject(int nested);
+        void DumpObject(const Handle<Object>& object, int level = 0);
 
-        std::unique_ptr<v8::Platform> platform;
-        v8::Isolate::CreateParams create_params;
-        v8::Isolate* isolate;
+        std::unique_ptr<Platform> platform;
+        Isolate::CreateParams create_params;
 };
 
 #endif

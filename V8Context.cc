@@ -3,10 +3,6 @@
 
 #define ELEMS 3
 
-using namespace v8;
-
-static uint64_t GetTypeFlags(const v8::Local<v8::Value>& v);
-
 V8Context::V8Context(const char* flags)
 {
     // fprintf(stderr, "V8 construct\n");
@@ -14,93 +10,110 @@ V8Context::V8Context(const char* flags)
 
     // Create a new Isolate and make it the current one.
     create_params.array_buffer_allocator =
-        v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+        ArrayBuffer::Allocator::NewDefaultAllocator();
     // fprintf(stderr, "V8 created allocator\n");
-    isolate = v8::Isolate::New(create_params);
+    isolate = Isolate::New(create_params);
     // fprintf(stderr, "V8 created isolate\n");
     // fprintf(stderr, "V8 construct done\n");
+
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
+
+    // Create a new context.
+    Local<Context> context = Context::New(isolate);
+    persistent_context.Reset(isolate, context);
 }
 
 V8Context::~V8Context()
 {
-    // fprintf(stderr, "V8 destruct\n");
     delete create_params.array_buffer_allocator;
     V8Context::terminate_v8();
-    // fprintf(stderr, "V8 destruct done\n");
+}
+
+SV* V8Context::get(const char* name)
+{
+    return pl_get_global_or_property(aTHX_ this, name);
+}
+
+void V8Context::set(const char* name, SV* value)
+{
+    pl_set_global_or_property(aTHX_ this, name, value);
 }
 
 int V8Context::eval(const char* code, const char* file)
 {
-    v8::Isolate::Scope isolate_scope(isolate);
+    // Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
 
-    // Create a stack-allocated handle scope.
-    v8::HandleScope handle_scope(isolate);
+    fprintf(stderr, "creating copy of context\n");
+    Local<Context> context = Local<Context>::New(isolate, persistent_context);
+    Context::Scope context_scope(context);
+    fprintf(stderr, "created copy of context\n");
 
-    // Create a new context.
-    v8::Local<v8::Context> context = v8::Context::New(isolate);
-
-    // Enter the context for compiling and running the hello world script.
-    v8::Context::Scope context_scope(context);
-
+#if 1
     // Create a string containing the JavaScript source code.
-    v8::Local<v8::String> source =
-        v8::String::NewFromUtf8(isolate, code, v8::NewStringType::kNormal)
+    Local<String> source =
+        String::NewFromUtf8(isolate, code, NewStringType::kNormal)
         .ToLocalChecked();
 
     // Compile the source code.
-    v8::Local<v8::Script> script =
-        v8::Script::Compile(context, source).ToLocalChecked();
+    Local<Script> script =
+        Script::Compile(context, source).ToLocalChecked();
 
     // Run the script to get the result.
-    v8::Local<v8::Value> result = script->Run(context).ToLocalChecked();
+    Local<Value> result = script->Run(context).ToLocalChecked();
 
     // Convert the result to an UTF8 string and print it.
-    v8::String::Utf8Value utf8(isolate, result);
+    String::Utf8Value utf8(isolate, result);
     fprintf(stderr, "GONZO: [%s]\n", *utf8);
+#endif
 
-    v8::Handle<v8::Array> a = CreateArray(2);
+#if 0
+    Handle<Array> a = CreateArray(2);
     fprintf(stderr, "GONZO: GOT ARRAY with %d elements\n", a->Length());
     DumpObject(a);
 
-    v8::Handle<v8::Object> o = CreateObject(2);
+    Handle<Object> o = CreateObject(2);
     fprintf(stderr, "GONZO: GOT OBJECT\n");
     DumpObject(o);
+#endif
 
     return 0;
 }
 
-v8::Handle<v8::Array> V8Context::CreateArray(int nested)
+#if 0
+Handle<Array> V8Context::CreateArray(int nested)
 {
     // We will be creating temporary handles so we use a handle scope.
-    v8::EscapableHandleScope handle_scope(isolate);
+    EscapableHandleScope handle_scope(isolate);
 
     // Create a new empty array.
-    v8::Handle<v8::Array> array = v8::Array::New(isolate);
+    Handle<Array> array = Array::New(isolate);
 
     // Return an empty result if there was an error creating the array.
     if (array.IsEmpty()) {
         fprintf(stderr, "%2d: Returning empty array\n", nested);
-        return v8::Handle<v8::Array>();
+        return Handle<Array>();
     }
 
     // Fill out some values
     int j = 0;
     for (; j < ELEMS; ++j) {
         int v = j*(10+nested);
-        array->Set(j, v8::Integer::New(isolate, v));
+        array->Set(j, Integer::New(isolate, v));
         fprintf(stderr, "%2d: Added element %2d => %3d\n", nested, j, v);
     }
-    array->Set(j++, v8::Boolean::New(isolate, (j%2) == 0));
-    array->Set(j++, v8::Boolean::New(isolate, (j%2) == 0));
+    array->Set(j, Boolean::New(isolate, (j%2) == 0)); ++j;
+    array->Set(j, Boolean::New(isolate, (j%2) == 0)); ++j;
     switch (nested) {
         case 2: {
-            v8::Handle<v8::Array> a = CreateArray(1);
+            Handle<Array> a = CreateArray(1);
             array->Set(j, a);
             fprintf(stderr, "%2d: Added nested array %2d\n", nested, j);
             break;
         }
         case 1: {
-            v8::Handle<v8::Object> o = CreateObject(0);
+            Handle<Object> o = CreateObject(0);
             array->Set(j, o);
             fprintf(stderr, "%2d: Added nested object %2d\n", nested, j);
             break;
@@ -113,45 +126,45 @@ v8::Handle<v8::Array> V8Context::CreateArray(int nested)
     return handle_scope.Escape(array);
 }
 
-v8::Handle<v8::Object> V8Context::CreateObject(int nested)
+Handle<Object> V8Context::CreateObject(int nested)
 {
     // We will be creating temporary handles so we use a handle scope.
-    v8::EscapableHandleScope handle_scope(isolate);
+    EscapableHandleScope handle_scope(isolate);
 
     // Create a new empty object.
-    v8::Handle<v8::Object> object = v8::Object::New(isolate);
+    Handle<Object> object = Object::New(isolate);
 
     // Return an empty result if there was an error creating the array.
     if (object.IsEmpty()) {
         fprintf(stderr, "%2d: Returning empty object\n", nested);
-        return v8::Handle<v8::Object>();
+        return Handle<Object>();
     }
 
-    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    Local<Context> context = isolate->GetCurrentContext();
 
     int j = 0;
     for (j = 0; j < ELEMS; ++j) {
         char k[256];
         int v = j*(10+nested);
         sprintf(k, "key_%d", j);
-        v8::Local<v8::Value> key = v8::String::NewFromUtf8(isolate, k, v8::NewStringType::kNormal)
+        Local<Value> key = String::NewFromUtf8(isolate, k, NewStringType::kNormal)
             .ToLocalChecked();
-        v8::Local<v8::Value> val = v8::Integer::New(isolate, v);
+        Local<Value> val = Integer::New(isolate, v);
         object->Set(context, key, val);
         fprintf(stderr, "%2d: Set key [%s] to value %d\n", nested, k, v);
     }
     switch (nested) {
         case 2: {
-            v8::Handle<v8::Object> o = CreateObject(1);
-            v8::Local<v8::Value> key = v8::String::NewFromUtf8(isolate, "nested", v8::NewStringType::kNormal)
+            Handle<Object> o = CreateObject(1);
+            Local<Value> key = String::NewFromUtf8(isolate, "nested", NewStringType::kNormal)
                 .ToLocalChecked();
             object->Set(context, key, o);
             fprintf(stderr, "%2d: Added nested object\n", nested);
             break;
         }
         case 1: {
-            v8::Handle<v8::Array> a = CreateArray(0);
-            v8::Local<v8::Value> key = v8::String::NewFromUtf8(isolate, "array", v8::NewStringType::kNormal)
+            Handle<Array> a = CreateArray(0);
+            Local<Value> key = String::NewFromUtf8(isolate, "array", NewStringType::kNormal)
                 .ToLocalChecked();
             object->Set(context, key, a);
             fprintf(stderr, "%2d: Added nested array\n", nested);
@@ -166,8 +179,9 @@ v8::Handle<v8::Object> V8Context::CreateObject(int nested)
     // Return the value through Close.
     return handle_scope.Escape(object);
 }
+#endif
 
-void V8Context::DumpObject(const v8::Handle<v8::Object>& object, int level)
+void V8Context::DumpObject(const Handle<Object>& object, int level)
 {
     // uint64_t mask = GetTypeFlags(object);
     // fprintf(stderr, "%2d: OBJECT MASK: %llx\n", level, mask);
@@ -191,12 +205,12 @@ void V8Context::DumpObject(const v8::Handle<v8::Object>& object, int level)
         fprintf(stderr, "<%s>", *value);
     }
     else if (object->IsArray()) {
-        v8::Handle<v8::Array> array = v8::Handle<v8::Array>::Cast(object);
+        Handle<Array> array = Handle<Array>::Cast(object);
         int size = array->Length();
         // fprintf(stderr, "%2d: ARRAY with %d elements\n", level, size);
         fprintf(stderr, "[");
         for (int j = 0; j < size; ++j) {
-            Handle<v8::Object> elem = Local<Object>::Cast(array->Get(j));
+            Handle<Object> elem = Local<Object>::Cast(array->Get(j));
             // fprintf(stderr, "%2d:  elem %2d: ", level, j);
             if (j > 0) fprintf(stderr, ", ");
             DumpObject(elem, level+1);
@@ -208,8 +222,8 @@ void V8Context::DumpObject(const v8::Handle<v8::Object>& object, int level)
         // fprintf(stderr, "%2d: OBJECT with %d properties\n", level, property_names->Length());
         fprintf(stderr, "{");
         for (int j = 0; j < property_names->Length(); ++j) {
-            Handle<v8::Object> key = Local<Object>::Cast(property_names->Get(j));
-            Handle<v8::Object> value = Local<Object>::Cast(object->Get(key));
+            Handle<Object> key = Local<Object>::Cast(property_names->Get(j));
+            Handle<Object> value = Local<Object>::Cast(object->Get(key));
             // fprintf(stderr, "%2d:  slot %d: ", level, j);
             if (j > 0) fprintf(stderr, ", ");
             DumpObject(key, level+1);
@@ -228,11 +242,11 @@ void V8Context::initialize_v8()
 {
     // fprintf(stderr, "V8 initializing\n");
     const char* prog = "foo";
-    v8::V8::InitializeICUDefaultLocation(prog);
-    v8::V8::InitializeExternalStartupData(prog);
-    platform = v8::platform::NewDefaultPlatform();
-    v8::V8::InitializePlatform(platform.get());
-    v8::V8::Initialize();
+    V8::InitializeICUDefaultLocation(prog);
+    V8::InitializeExternalStartupData(prog);
+    platform = platform::NewDefaultPlatform();
+    V8::InitializePlatform(platform.get());
+    V8::Initialize();
     // fprintf(stderr, "V8 initializing done\n");
 }
 
@@ -240,12 +254,12 @@ void V8Context::terminate_v8()
 {
     // fprintf(stderr, "V8 terminating\n");
     isolate->Dispose();
-    v8::V8::Dispose();
-    v8::V8::ShutdownPlatform();
+    V8::Dispose();
+    V8::ShutdownPlatform();
     // fprintf(stderr, "V8 terminating done\n");
 }
 
-static uint64_t GetTypeFlags(const v8::Local<v8::Value>& v)
+uint64_t V8Context::GetTypeFlags(const Local<Value>& v)
 {
     uint64_t result = 0;
     if (v->IsArgumentsObject()  ) result |= 0x0000000000000001;
