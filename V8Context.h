@@ -13,8 +13,9 @@ class V8Context {
         ~V8Context();
 
         SV* get(const char* name);
-        void set(const char* name, SV* value);
+        SV* exists(const char* name);
 
+        void set(const char* name, SV* value);
         int eval(const char* code, const char* file = 0);
 
         Isolate* isolate;

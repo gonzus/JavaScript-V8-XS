@@ -60,6 +60,8 @@ const v8::Handle<v8::Object> pl_perl_to_v8(pTHX_ SV* value, V8Context* ctx);
 SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name);
 int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value);
 
+SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name);
+
 #if 0
 /*
  * Return a Perl string with the type of the duktape variable
@@ -72,7 +74,6 @@ const char* pl_typeof(pTHX_ duk_context* ctx, int pos);
 int pl_call_perl_sv(duk_context* ctx, SV* func);
 
 /* Get / set the value for a global object or a slot in an object */
-SV* pl_exists_global_or_property(pTHX_ duk_context* ctx, const char* name);
 SV* pl_typeof_global_or_property(pTHX_ duk_context* ctx, const char* name);
 SV* pl_instanceof_global_or_property(pTHX_ duk_context* ctx, const char* object, const char* class);
 SV* pl_get_global_or_property(pTHX_ duk_context* ctx, const char* name);

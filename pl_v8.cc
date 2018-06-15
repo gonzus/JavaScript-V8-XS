@@ -273,53 +273,6 @@ static int find_last_dot(const char* name, int* len)
     return last_dot;
 }
 
-#if 1
-static Handle<Object> find_global_or_property(pTHX_ V8Context* ctx, const char* name)
-{
-    // Isolate::Scope isolate_scope(ctx->isolate);
-    // fprintf(stderr, "GOT isolate scope\n");
-    // fprintf(stderr, "CREATING handle scope\n");
-    // EscapableHandleScope handle_scope(ctx->isolate);
-    HandleScope handle_scope(ctx->isolate);
-    // fprintf(stderr, "GOT handle scope\n");
-
-    Handle<Object> object;
-
-    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
-    fprintf(stderr, "GOT context\n");
-    Context::Scope context_scope(context);
-    fprintf(stderr, "SET context scope\n");
-    int len = 0;
-    int last_dot = find_last_dot(name, &len);
-    if (last_dot < 0) {
-        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name, NewStringType::kNormal).ToLocalChecked();
-        fprintf(stderr, "GOT v8_name\n");
-        Handle<Object> global = context->Global();
-        fprintf(stderr, "GOT global\n");
-        Local<Value> value = global->Get(v8_name);
-        fprintf(stderr, "GOT local value\n");
-        object = Local<Object>::Cast(value);
-        fprintf(stderr, "GOT handle value\n");
-    } else {
-#if 0
-        if (duk_peval_lstring(ctx, name, last_dot) == 0) {
-            if (duk_get_prop_lstring(ctx, -1, name + last_dot + 1, len - last_dot - 1)) {
-                ret = 1;
-                duk_swap(ctx, -2, -1);
-                duk_pop(ctx); /* pop object, leave value */
-            } else {
-                duk_pop_2(ctx); /* pop object and value (which was undef) */
-            }
-        } else {
-        }
-#endif
-    }
-    // pl_v8_to_perl(aTHX_ ctx, object);
-    // return handle_scope.Escape(object);
-    return object;
-}
-#endif
-
 SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name)
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
@@ -365,6 +318,29 @@ int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value)
         // TODO
     }
 
+    return ret;
+}
+
+SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name)
+{
+    SV* ret = &PL_sv_no; /* return false by default */
+
+    Isolate::Scope isolate_scope(ctx->isolate);
+    HandleScope handle_scope(ctx->isolate);
+
+    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Context::Scope context_scope(context);
+
+    int len = 0;
+    int last_dot = find_last_dot(name, &len);
+    if (last_dot < 0) {
+        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name, NewStringType::kNormal).ToLocalChecked();
+        if (context->Global()->Has(v8_name)) {
+            ret = &PL_sv_yes;
+        }
+    } else {
+        // TODO
+    }
     return ret;
 }
 
@@ -462,16 +438,6 @@ int pl_call_perl_sv(duk_context* ctx, SV* func)
     FREETMPS;
     LEAVE;
     return 1;
-}
-
-SV* pl_exists_global_or_property(pTHX_ duk_context* ctx, const char* name)
-{
-    SV* ret = &PL_sv_no; /* return false by default */
-    if (find_global_or_property(ctx, name)) {
-        ret = &PL_sv_yes;
-        duk_pop(ctx); /* pop value */
-    }
-    return ret;
 }
 
 SV* pl_typeof_global_or_property(pTHX_ duk_context* ctx, const char* name)

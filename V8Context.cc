@@ -35,6 +35,11 @@ SV* V8Context::get(const char* name)
     return pl_get_global_or_property(aTHX_ this, name);
 }
 
+SV* V8Context::exists(const char* name)
+{
+    return pl_exists_global_or_property(aTHX_ this, name);
+}
+
 void V8Context::set(const char* name, SV* value)
 {
     pl_set_global_or_property(aTHX_ this, name, value);
