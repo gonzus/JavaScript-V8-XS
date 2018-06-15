@@ -4,6 +4,7 @@ use warnings;
 use Data::Dumper;
 use Time::HiRes;
 use Test::More;
+
 my $CLASS = 'JavaScript::V8::XS';
 
 sub test_now {
