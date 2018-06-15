@@ -8,8 +8,6 @@ use Test::Output;
 my $CLASS = 'JavaScript::V8::XS';
 
 sub test_set_get_and_exists {
-    use_ok($CLASS);
-
     my $vm = $CLASS->new();
     ok($vm, "created $CLASS object");
 
@@ -27,7 +25,7 @@ sub test_set_get_and_exists {
         'aref_mixed' => [1, 0, 'gonzo'],
         'href_empty' => {},
         'href_simple' => { 'one' => 1, 'two' => 2 },
-        # 'gonzo' => sub { print("HOI\n"); },
+        'gonzo' => sub { print("HOI\n"); },
         'object' => $obj,
 
         'foo' => "2+3*4",
@@ -119,18 +117,20 @@ sub test_roundtrip {
         my $js_name = "js_$name";
         $test_name = $name;
         $expected_args = $args;
-        my $got_eval = $vm->eval("$js_name = perl_test.apply(this, $name)");
-        is_deeply($got_eval, $args, "calling perl_test() works for $name");
+        # my $got_eval = $vm->eval("$js_name = perl_test.apply(this, $name)");
+        # is_deeply($got_eval, $args, "calling perl_test() works for $name");
 
-        my $got_get = $vm->get($js_name);
-        is_deeply($got_get, $args, "return value from perl_test() works for $name");
+        # my $got_get = $vm->get($js_name);
+        # is_deeply($got_get, $args, "return value from perl_test() works for $name");
     }
 }
 
 sub main {
+    use_ok($CLASS);
+
     test_set_get_and_exists();
-    # test_eval();
-    # test_roundtrip();
+    test_eval();
+    test_roundtrip();
     done_testing;
     return 0;
 }
