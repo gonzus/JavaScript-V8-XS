@@ -7,34 +7,107 @@
 
 using namespace v8;
 
+struct FuncData {
+    FuncData(V8Context* ctx, SV* func) :
+        ctx(ctx), func(func) {}
+
+    V8Context* ctx;
+    SV* func;
+};
+
+static void perl_caller(const FunctionCallbackInfo<Value>& args)
+{
+    Local<Function> v8_func = Local<Function>::Cast(args.This());
+    fprintf(stderr, "YES MOTHERFUCKER!\n");
+    Isolate* isolate = args.GetIsolate();
+    Local<Name> v8_key = String::NewFromUtf8(isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
+    Local<External> v8_val = Local<External>::Cast(args.Data());
+    FuncData* data = (FuncData*) v8_val->Value();
+    fprintf(stderr, "PTR => %p\n", data);
+    // HandleScope handle_scope(data->ctx->isolate);
+
+    SV* ret = 0;
+
+    /* prepare Perl environment for calling the CV */
+    dTHX;
+    dSP;
+    ENTER;
+    SAVETMPS;
+    PUSHMARK(SP);
+
+    /* pass in the stack each of the params we received */
+    int nargs = args.Length();
+    fprintf(stderr, "ARGS: %d\n", nargs);
+    for (int j = 0; j < nargs; j++) {
+        Local<Value> arg = Local<Value>::Cast(args[j]);
+        fprintf(stderr, "GOT ARG %d\n", j);
+        Handle<Object> object = Local<Object>::Cast(arg);
+        fprintf(stderr, "GOT HANDLE %d\n", j);
+        SV* val = pl_v8_to_perl(aTHX_ data->ctx, object);
+        fprintf(stderr, "GOT PERL %d\n", j);
+        mXPUSHs(val);
+        fprintf(stderr, "PUSHED ARG %d\n", j);
+    }
+
+    /* call actual Perl CV, passing all params */
+    PUTBACK;
+    call_sv(data->func, G_SCALAR | G_EVAL);
+    SPAGAIN;
+
+    /* get returned value from Perl and return it */
+    ret = POPs;
+    Handle<Object> object = pl_perl_to_v8(aTHX_ ret, data->ctx);
+
+    args.GetReturnValue().Set(object);
+
+    /* cleanup */
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+}
+
 static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object, HV* seen)
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
     if (object->IsUndefined()) {
-        // fprintf(stderr, "V8 UNDEFINED\n");
+        fprintf(stderr, "V8 UNDEFINED\n");
     }
     else if (object->IsNull()) {
-        // fprintf(stderr, "V8 NULL\n");
+        fprintf(stderr, "V8 NULL\n");
     }
     else if (object->IsBoolean()) {
         bool val = object->BooleanValue();
-        // fprintf(stderr, "V8 BOOLEAN %d\n", (int) val);
+        fprintf(stderr, "V8 BOOLEAN %d\n", (int) val);
         ret = newSViv(val);
     }
     else if (object->IsNumber()) {
         double val = object->NumberValue();
-        // fprintf(stderr, "V8 NUMBER %f\n", val);
+        fprintf(stderr, "V8 NUMBER %f\n", val);
         ret = newSVnv(val);  /* JS numbers are always doubles */
     }
     else if (object->IsString()) {
-        String::Utf8Value val(object);
-        // fprintf(stderr, "V8 STRING [%s]\n", *val);
+        fprintf(stderr, "STRING BABY\n");
+        String::Utf8Value val(ctx->isolate, object);
+        fprintf(stderr, "V8 STRING [%s]\n", *val);
         ret = newSVpvn(*val, val.length());
         SvUTF8_on(ret); /* yes, always */
     }
     else if (object->IsFunction()) {
-        // fprintf(stderr, "V8 FUNCTION\n");
-        // TODO
+        fprintf(stderr, "V8 FUNCTION\n");
+        Local<Function> v8_func = Local<Function>::Cast(object);
+        Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
+        Local<External> v8_val = Local<External>::Cast(object->Get(v8_key));
+        FuncData* data = (FuncData*) v8_val->Value();
+        fprintf(stderr, "PTR => %p\n", data);
+        ret = data->func;
+#if 0
+        /* if the JS function has a slot with the Perl callback, */
+        /* then we know we created it, so we return that */
+        if (duk_get_prop_lstring(ctx, pos, PL_SLOT_GENERIC_CALLBACK, sizeof(PL_SLOT_GENERIC_CALLBACK) - 1)) {
+            ret = (SV*) duk_get_pointer(ctx, pos);
+        }
+        duk_pop(ctx); /* pop function / null pointer */
+#endif
     }
     else if (object->IsArray()) {
         SV** answer = 0;
@@ -59,7 +132,7 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 
             Handle<Array> array = Handle<Array>::Cast(object);
             int array_top = array->Length();
-            // fprintf(stderr, "V8 ARRAY %d\n", array_top);
+            fprintf(stderr, "V8 ARRAY %d\n", array_top);
             for (int j = 0; j < array_top; ++j) {
                 Handle<Object> elem = Local<Object>::Cast(array->Get(j));
                 // TODO: check we got a valid element
@@ -96,11 +169,11 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 
             Local<Array> property_names = object->GetOwnPropertyNames();
             int hash_top = property_names->Length();
-            // fprintf(stderr, "V8 HASH %d\n", hash_top);
+            fprintf(stderr, "V8 HASH %d\n", hash_top);
             for (int j = 0; j < hash_top; ++j) {
                 Local<Value> v8_key = property_names->Get(j);
                 // TODO: check we got a valid key
-                String::Utf8Value key(v8_key->ToString());
+                String::Utf8Value key(ctx->isolate, v8_key->ToString());
 
                 Handle<Object> val = Local<Object>::Cast(object->Get(v8_key));
                 // TODO: check we got a valid value
@@ -237,6 +310,40 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
                 }
             }
         } else if (SvTYPE(ref) == SVt_PVCV) {
+#if 1
+            fprintf(stderr, "PL SUB\n");
+            SV* func = newSVsv(value);
+            FuncData* data = new FuncData(ctx, func);
+            Local<Value> val = External::New(ctx->isolate, data);
+            fprintf(stderr, "CREATED callback value => %p\n", data);
+
+            // Local<ObjectTemplate> object_template = Local<ObjectTemplate>::New(ctx->isolate, ctx->persistent_template);
+            Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, perl_caller, val);
+            fprintf(stderr, "CREATED function template\n");
+            Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
+            fprintf(stderr, "CREATED callback key\n");
+            Local<Function> v8_func = ft->GetFunction();
+            fprintf(stderr, "GOT function\n");
+            v8_func->Set(v8_key, val);
+            fprintf(stderr, "SET callback slot\n");
+            ret = Local<Object>::Cast(v8_func);
+            fprintf(stderr, "DONE?!?\n");
+            // object_template->Set( String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), ft);
+#else
+            croak("Don't know yet how to deal with a Perl sub\n");
+            /* use perl_caller as generic handler, but store the real callback */
+            /* in a slot, from where we can later retrieve it */
+            SV* func = newSVsv(value);
+            duk_push_c_function(ctx, perl_caller, DUK_VARARGS);
+            if (!func) {
+                croak("Could not create copy of Perl callback\n");
+            }
+            duk_push_pointer(ctx, func);
+            if (! duk_put_prop_lstring(ctx, -2, PL_SLOT_GENERIC_CALLBACK, sizeof(PL_SLOT_GENERIC_CALLBACK) - 1)) {
+                croak("Could not associate C dispatcher and Perl callback\n");
+            }
+#endif
+        } else {
             croak("Don't know how to deal with an undetermined Perl reference\n");
         }
     } else {
@@ -403,43 +510,6 @@ static const char* get_typeof(duk_context* ctx, int pos)
     return label;
 }
 
-int pl_call_perl_sv(duk_context* ctx, SV* func)
-{
-    duk_idx_t j = 0;
-    duk_idx_t nargs = 0;
-    SV* ret = 0;
-
-    /* prepare Perl environment for calling the CV */
-    dTHX;
-    dSP;
-    ENTER;
-    SAVETMPS;
-    PUSHMARK(SP);
-
-    /* pass in the stack each of the params we received */
-    nargs = duk_get_top(ctx);
-    for (j = 0; j < nargs; j++) {
-        SV* val = pl_duk_to_perl(aTHX_ ctx, j);
-        mXPUSHs(val);
-    }
-
-    /* call actual Perl CV, passing all params */
-    PUTBACK;
-    call_sv(func, G_SCALAR | G_EVAL);
-    SPAGAIN;
-
-    /* get returned value from Perl and push its JS equivalent back in */
-    /* duktape's stack */
-    ret = POPs;
-    pl_perl_to_duk(aTHX_ ret, ctx);
-
-    /* cleanup and return 1, indicating we are returning a value */
-    PUTBACK;
-    FREETMPS;
-    LEAVE;
-    return 1;
-}
-
 SV* pl_typeof_global_or_property(pTHX_ duk_context* ctx, const char* name)
 {
     const char* cstr = "undefined";
@@ -521,24 +591,5 @@ int pl_run_gc(Duk* duk)
         duk_gc(ctx, DUK_GC_COMPACT);
     }
     return PL_GC_RUNS;
-}
-
-static duk_ret_t perl_caller(duk_context* ctx)
-{
-    SV* func = 0;
-
-    /* get actual Perl CV stored as a function property */
-    duk_push_current_function(ctx);
-    if (!duk_get_prop_lstring(ctx, -1, PL_SLOT_GENERIC_CALLBACK, sizeof(PL_SLOT_GENERIC_CALLBACK) - 1)) {
-        croak("Calling Perl handler for a non-Perl function\n");
-    }
-
-    func = (SV*) duk_get_pointer(ctx, -1);
-    duk_pop_2(ctx);  /* pop pointer and function */
-    if (func == 0) {
-        croak("Could not get value for property %s\n", PL_SLOT_GENERIC_CALLBACK);
-    }
-
-    return pl_call_perl_sv(ctx, func);
 }
 #endif

@@ -3,10 +3,55 @@
 
 #define ELEMS 3
 
-V8Context::V8Context(const char* flags)
+int V8Context::instance_count = 0;
+std::unique_ptr<Platform> V8Context::platform = 0;
+
+// Extracts a C string from a V8 Utf8Value.
+static const char* ToCString(const String::Utf8Value& value)
 {
-    // fprintf(stderr, "V8 construct\n");
-    V8Context::initialize_v8();
+    return *value ? *value : "<string conversion failed>";
+}
+
+// The callback that is invoked by v8 whenever the JavaScript 'print'
+// function is called.  Prints its arguments on stdout separated by
+// spaces and ending with a newline.
+static void Print(const FunctionCallbackInfo<Value>& args)
+{
+    bool first = true;
+    for (int i = 0; i < args.Length(); i++) {
+        HandleScope handle_scope(args.GetIsolate());
+        if (first) {
+            first = false;
+        } else {
+            printf(" ");
+        }
+        String::Utf8Value str(args.GetIsolate(), args[i]);
+        const char* cstr = ToCString(str);
+        printf("%s", cstr);
+    }
+    printf("\n");
+    fflush(stdout);
+}
+
+static void Version(const FunctionCallbackInfo<Value>& args)
+{
+    args.GetReturnValue().Set(
+            String::NewFromUtf8(args.GetIsolate(), V8::GetVersion(),
+                NewStringType::kNormal).ToLocalChecked());
+}
+
+V8Context::V8Context(const char* program_)
+{
+    fprintf(stderr, "V8 constructing\n");
+    program = new char[256];
+    if (program_) {
+        strcpy(program, program_);
+    }
+    else {
+        sprintf(program, "program_%05d", instance_count);
+    }
+
+    V8Context::initialize_v8(this);
 
     // Create a new Isolate and make it the current one.
     create_params.array_buffer_allocator =
@@ -19,15 +64,38 @@ V8Context::V8Context(const char* flags)
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
+    // Create a template for the global object.
+    Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
+
+    // Bind the global 'print' function to the C++ Print callback.
+    Local<FunctionTemplate> ft = FunctionTemplate::New(isolate, Print);
+    Local<Name> v8_key = String::NewFromUtf8(isolate, "func_property", NewStringType::kNormal).ToLocalChecked();
+    Local<Value> val = Integer::New(isolate, 11);
+    ft->Set(v8_key, val);
+    // ft->Set("func_property", val);
+    object_template->Set(
+            String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(),
+            ft);
+
+    // Bind the 'version' function
+    object_template->Set(
+            String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(),
+            FunctionTemplate::New(isolate, Version));
+
     // Create a new context.
-    Local<Context> context = Context::New(isolate);
+    Local<Context> context = Context::New(isolate, 0, object_template);
     persistent_context.Reset(isolate, context);
+    persistent_template.Reset(isolate, object_template);
+    fprintf(stderr, "V8 constructing done\n");
 }
 
 V8Context::~V8Context()
 {
+    isolate->Dispose();
     delete create_params.array_buffer_allocator;
-    V8Context::terminate_v8();
+    delete[] program;
+    // V8Context::terminate_v8(this);
+    fprintf(stderr, "V8 destroying done\n");
 }
 
 SV* V8Context::get(const char* name)
@@ -45,7 +113,7 @@ void V8Context::set(const char* name, SV* value)
     pl_set_global_or_property(aTHX_ this, name, value);
 }
 
-int V8Context::eval(const char* code, const char* file)
+SV* V8Context::eval(const char* code, const char* file)
 {
     // Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
@@ -56,6 +124,7 @@ int V8Context::eval(const char* code, const char* file)
     fprintf(stderr, "created copy of context\n");
 
 #if 1
+    fprintf(stderr, "COMPILE:<\n%s\n>\n", code);
     // Create a string containing the JavaScript source code.
     Local<String> source =
         String::NewFromUtf8(isolate, code, NewStringType::kNormal)
@@ -67,11 +136,11 @@ int V8Context::eval(const char* code, const char* file)
 
     // Run the script to get the result.
     Local<Value> result = script->Run(context).ToLocalChecked();
+#endif
 
     // Convert the result to an UTF8 string and print it.
     String::Utf8Value utf8(isolate, result);
     fprintf(stderr, "GONZO: [%s]\n", *utf8);
-#endif
 
 #if 0
     Handle<Array> a = CreateArray(2);
@@ -83,7 +152,14 @@ int V8Context::eval(const char* code, const char* file)
     DumpObject(o);
 #endif
 
-    return 0;
+    SV* ret = &PL_sv_undef; /* return undef by default */
+#if 1
+    fprintf(stderr, "Script run\n");
+    Handle<Object> object = Local<Object>::Cast(result);
+    fprintf(stderr, "Created object\n");
+    ret = pl_v8_to_perl(aTHX_ this, object);
+#endif
+    return ret;
 }
 
 #if 0
@@ -243,25 +319,27 @@ void V8Context::DumpObject(const Handle<Object>& object, int level)
     }
 }
 
-void V8Context::initialize_v8()
+void V8Context::initialize_v8(V8Context* self)
 {
-    // fprintf(stderr, "V8 initializing\n");
-    const char* prog = "foo";
-    V8::InitializeICUDefaultLocation(prog);
-    V8::InitializeExternalStartupData(prog);
+    if (instance_count++) {
+        return;
+    }
+    V8::InitializeICUDefaultLocation(self->program);
+    V8::InitializeExternalStartupData(self->program);
     platform = platform::NewDefaultPlatform();
     V8::InitializePlatform(platform.get());
     V8::Initialize();
-    // fprintf(stderr, "V8 initializing done\n");
+    fprintf(stderr, "V8 initializing done\n");
 }
 
-void V8Context::terminate_v8()
+void V8Context::terminate_v8(V8Context* self)
 {
-    // fprintf(stderr, "V8 terminating\n");
-    isolate->Dispose();
+    if (--instance_count) {
+        return;
+    }
     V8::Dispose();
     V8::ShutdownPlatform();
-    // fprintf(stderr, "V8 terminating done\n");
+    fprintf(stderr, "V8 terminating done\n");
 }
 
 uint64_t V8Context::GetTypeFlags(const Local<Value>& v)

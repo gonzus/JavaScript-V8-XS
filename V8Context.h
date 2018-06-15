@@ -9,27 +9,31 @@ using namespace v8;
 
 class V8Context {
     public:
-        V8Context(const char* flags = NULL);
+        V8Context(const char* program = 0);
         ~V8Context();
 
         SV* get(const char* name);
         SV* exists(const char* name);
 
         void set(const char* name, SV* value);
-        int eval(const char* code, const char* file = 0);
+        SV* eval(const char* code, const char* file = 0);
 
         Isolate* isolate;
         Persistent<Context> persistent_context;
+        Persistent<ObjectTemplate> persistent_template;
 
         static uint64_t GetTypeFlags(const Local<Value>& v);
     private:
-        void initialize_v8();
-        void terminate_v8();
+        static void initialize_v8(V8Context* self);
+        static void terminate_v8(V8Context* self);
+        static int instance_count;
+        static std::unique_ptr<Platform> platform;
+
         Handle<Array> CreateArray(int nested);
         Handle<Object> CreateObject(int nested);
         void DumpObject(const Handle<Object>& object, int level = 0);
 
-        std::unique_ptr<Platform> platform;
+        char* program;
         Isolate::CreateParams create_params;
 };
 
