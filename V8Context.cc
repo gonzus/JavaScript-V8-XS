@@ -1,4 +1,5 @@
 #include "libplatform/libplatform.h"
+#include "pl_util.h"
 #include "V8Context.h"
 
 #define ELEMS 3
@@ -40,9 +41,15 @@ static void Version(const FunctionCallbackInfo<Value>& args)
                 NewStringType::kNormal).ToLocalChecked());
 }
 
+static void TimeStamp_ms(const FunctionCallbackInfo<Value>& args)
+{
+    double now = now_us() / 1000.0;
+    args.GetReturnValue().Set(Local<Object>::Cast(Number::New(args.GetIsolate(), now)));
+}
+
 V8Context::V8Context(const char* program_)
 {
-    fprintf(stderr, "V8 constructing\n");
+    // fprintf(stderr, "V8 constructing\n");
     program = new char[256];
     if (program_) {
         strcpy(program, program_);
@@ -82,11 +89,16 @@ V8Context::V8Context(const char* program_)
             String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(),
             FunctionTemplate::New(isolate, Version));
 
+    // Bind the 'timestamp_ms' function
+    object_template->Set(
+            String::NewFromUtf8(isolate, "timestamp_ms", NewStringType::kNormal).ToLocalChecked(),
+            FunctionTemplate::New(isolate, TimeStamp_ms));
+
     // Create a new context.
     Local<Context> context = Context::New(isolate, 0, object_template);
     persistent_context.Reset(isolate, context);
     persistent_template.Reset(isolate, object_template);
-    fprintf(stderr, "V8 constructing done\n");
+    // fprintf(stderr, "V8 constructing done\n");
 }
 
 V8Context::~V8Context()
@@ -95,7 +107,7 @@ V8Context::~V8Context()
     delete create_params.array_buffer_allocator;
     delete[] program;
     // V8Context::terminate_v8(this);
-    fprintf(stderr, "V8 destroying done\n");
+    // fprintf(stderr, "V8 destroying done\n");
 }
 
 SV* V8Context::get(const char* name)
@@ -118,13 +130,13 @@ SV* V8Context::eval(const char* code, const char* file)
     // Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
 
-    fprintf(stderr, "creating copy of context\n");
+    // fprintf(stderr, "creating copy of context\n");
     Local<Context> context = Local<Context>::New(isolate, persistent_context);
     Context::Scope context_scope(context);
-    fprintf(stderr, "created copy of context\n");
+    // fprintf(stderr, "created copy of context\n");
 
 #if 1
-    fprintf(stderr, "COMPILE:<\n%s\n>\n", code);
+    // fprintf(stderr, "COMPILE:<\n%s\n>\n", code);
     // Create a string containing the JavaScript source code.
     Local<String> source =
         String::NewFromUtf8(isolate, code, NewStringType::kNormal)
@@ -140,7 +152,7 @@ SV* V8Context::eval(const char* code, const char* file)
 
     // Convert the result to an UTF8 string and print it.
     String::Utf8Value utf8(isolate, result);
-    fprintf(stderr, "GONZO: [%s]\n", *utf8);
+    // fprintf(stderr, "GONZO: [%s]\n", *utf8);
 
 #if 0
     Handle<Array> a = CreateArray(2);
@@ -154,9 +166,9 @@ SV* V8Context::eval(const char* code, const char* file)
 
     SV* ret = &PL_sv_undef; /* return undef by default */
 #if 1
-    fprintf(stderr, "Script run\n");
+    // fprintf(stderr, "Script run\n");
     Handle<Object> object = Local<Object>::Cast(result);
-    fprintf(stderr, "Created object\n");
+    // fprintf(stderr, "Created object\n");
     ret = pl_v8_to_perl(aTHX_ this, object);
 #endif
     return ret;
@@ -329,7 +341,7 @@ void V8Context::initialize_v8(V8Context* self)
     platform = platform::NewDefaultPlatform();
     V8::InitializePlatform(platform.get());
     V8::Initialize();
-    fprintf(stderr, "V8 initializing done\n");
+    // fprintf(stderr, "V8 initializing done\n");
 }
 
 void V8Context::terminate_v8(V8Context* self)
@@ -339,7 +351,7 @@ void V8Context::terminate_v8(V8Context* self)
     }
     V8::Dispose();
     V8::ShutdownPlatform();
-    fprintf(stderr, "V8 terminating done\n");
+    // fprintf(stderr, "V8 terminating done\n");
 }
 
 uint64_t V8Context::GetTypeFlags(const Local<Value>& v)

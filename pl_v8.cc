@@ -18,12 +18,12 @@ struct FuncData {
 static void perl_caller(const FunctionCallbackInfo<Value>& args)
 {
     Local<Function> v8_func = Local<Function>::Cast(args.This());
-    fprintf(stderr, "YES MOTHERFUCKER!\n");
+    // fprintf(stderr, "YES MOTHERFUCKER!\n");
     Isolate* isolate = args.GetIsolate();
     Local<Name> v8_key = String::NewFromUtf8(isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
     Local<External> v8_val = Local<External>::Cast(args.Data());
     FuncData* data = (FuncData*) v8_val->Value();
-    fprintf(stderr, "PTR => %p\n", data);
+    // fprintf(stderr, "PTR => %p\n", data);
     // HandleScope handle_scope(data->ctx->isolate);
 
     SV* ret = 0;
@@ -37,16 +37,16 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
 
     /* pass in the stack each of the params we received */
     int nargs = args.Length();
-    fprintf(stderr, "ARGS: %d\n", nargs);
+    // fprintf(stderr, "ARGS: %d\n", nargs);
     for (int j = 0; j < nargs; j++) {
         Local<Value> arg = Local<Value>::Cast(args[j]);
-        fprintf(stderr, "GOT ARG %d\n", j);
+        // fprintf(stderr, "GOT ARG %d\n", j);
         Handle<Object> object = Local<Object>::Cast(arg);
-        fprintf(stderr, "GOT HANDLE %d\n", j);
+        // fprintf(stderr, "GOT HANDLE %d\n", j);
         SV* val = pl_v8_to_perl(aTHX_ data->ctx, object);
-        fprintf(stderr, "GOT PERL %d\n", j);
+        // fprintf(stderr, "GOT PERL %d\n", j);
         mXPUSHs(val);
-        fprintf(stderr, "PUSHED ARG %d\n", j);
+        // fprintf(stderr, "PUSHED ARG %d\n", j);
     }
 
     /* call actual Perl CV, passing all params */
@@ -70,35 +70,35 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
     if (object->IsUndefined()) {
-        fprintf(stderr, "V8 UNDEFINED\n");
+        // fprintf(stderr, "V8 UNDEFINED\n");
     }
     else if (object->IsNull()) {
-        fprintf(stderr, "V8 NULL\n");
+        // fprintf(stderr, "V8 NULL\n");
     }
     else if (object->IsBoolean()) {
         bool val = object->BooleanValue();
-        fprintf(stderr, "V8 BOOLEAN %d\n", (int) val);
+        // fprintf(stderr, "V8 BOOLEAN %d\n", (int) val);
         ret = newSViv(val);
     }
     else if (object->IsNumber()) {
         double val = object->NumberValue();
-        fprintf(stderr, "V8 NUMBER %f\n", val);
+        // fprintf(stderr, "V8 NUMBER %f\n", val);
         ret = newSVnv(val);  /* JS numbers are always doubles */
     }
     else if (object->IsString()) {
-        fprintf(stderr, "STRING BABY\n");
+        // fprintf(stderr, "STRING BABY\n");
         String::Utf8Value val(ctx->isolate, object);
-        fprintf(stderr, "V8 STRING [%s]\n", *val);
+        // fprintf(stderr, "V8 STRING [%s]\n", *val);
         ret = newSVpvn(*val, val.length());
         SvUTF8_on(ret); /* yes, always */
     }
     else if (object->IsFunction()) {
-        fprintf(stderr, "V8 FUNCTION\n");
+        // fprintf(stderr, "V8 FUNCTION\n");
         Local<Function> v8_func = Local<Function>::Cast(object);
         Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
         Local<External> v8_val = Local<External>::Cast(object->Get(v8_key));
         FuncData* data = (FuncData*) v8_val->Value();
-        fprintf(stderr, "PTR => %p\n", data);
+        // fprintf(stderr, "PTR => %p\n", data);
         ret = data->func;
 #if 0
         /* if the JS function has a slot with the Perl callback, */
@@ -132,7 +132,7 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 
             Handle<Array> array = Handle<Array>::Cast(object);
             int array_top = array->Length();
-            fprintf(stderr, "V8 ARRAY %d\n", array_top);
+            // fprintf(stderr, "V8 ARRAY %d\n", array_top);
             for (int j = 0; j < array_top; ++j) {
                 Handle<Object> elem = Local<Object>::Cast(array->Get(j));
                 // TODO: check we got a valid element
@@ -169,7 +169,7 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 
             Local<Array> property_names = object->GetOwnPropertyNames();
             int hash_top = property_names->Length();
-            fprintf(stderr, "V8 HASH %d\n", hash_top);
+            // fprintf(stderr, "V8 HASH %d\n", hash_top);
             for (int j = 0; j < hash_top; ++j) {
                 Local<Value> v8_key = property_names->Get(j);
                 // TODO: check we got a valid key
@@ -311,23 +311,23 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
             }
         } else if (SvTYPE(ref) == SVt_PVCV) {
 #if 1
-            fprintf(stderr, "PL SUB\n");
+            // fprintf(stderr, "PL SUB\n");
             SV* func = newSVsv(value);
             FuncData* data = new FuncData(ctx, func);
             Local<Value> val = External::New(ctx->isolate, data);
-            fprintf(stderr, "CREATED callback value => %p\n", data);
+            // fprintf(stderr, "CREATED callback value => %p\n", data);
 
             // Local<ObjectTemplate> object_template = Local<ObjectTemplate>::New(ctx->isolate, ctx->persistent_template);
             Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, perl_caller, val);
-            fprintf(stderr, "CREATED function template\n");
+            // fprintf(stderr, "CREATED function template\n");
             Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
-            fprintf(stderr, "CREATED callback key\n");
+            // fprintf(stderr, "CREATED callback key\n");
             Local<Function> v8_func = ft->GetFunction();
-            fprintf(stderr, "GOT function\n");
+            // fprintf(stderr, "GOT function\n");
             v8_func->Set(v8_key, val);
-            fprintf(stderr, "SET callback slot\n");
+            // fprintf(stderr, "SET callback slot\n");
             ret = Local<Object>::Cast(v8_func);
-            fprintf(stderr, "DONE?!?\n");
+            // fprintf(stderr, "DONE?!?\n");
             // object_template->Set( String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), ft);
 #else
             croak("Don't know yet how to deal with a Perl sub\n");
