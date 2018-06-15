@@ -4,11 +4,14 @@ use warnings;
 use Data::Dumper;
 use Test::More;
 use Test::Output;
-use JavaScript::V8::XS;
+
+my $CLASS = 'JavaScript::V8::XS';
 
 sub test_set_get_and_exists {
-    my $duk = JavaScript::V8::XS->new();
-    ok($duk, "created JavaScript::V8::XS object");
+    use_ok($CLASS);
+
+    my $vm = $CLASS->new();
+    ok($vm, "created $CLASS object");
 
     my $obj = {}; bless $obj, "Gonzo";
     my %values = (
@@ -39,28 +42,24 @@ sub test_set_get_and_exists {
     foreach my $case (sort keys %values) {
         my $name = "name_$case";
         my $expected = $values{$case};
-        # ok(!$duk->exists($name), "does not exist yet for [$case]");
-        # printf STDERR ("SET [%s]\n", $name);
-        $duk->set($name, $expected);
-        # printf STDERR ("GET [%s]\n", $name);
-        my $got = $duk->get($name);
-        # printf STDERR ("OK [%s]\n", $name);
-        # ok($duk->exists($name), "exists for [$case]");
+        ok(!$vm->exists($name), "does not exist yet for [$case]");
+        $vm->set($name, $expected);
+        my $got = $vm->get($name);
+        ok($vm->exists($name), "exists for [$case]");
         is_deeply($got, $expected, "set and get for [$case]")
             or printf STDERR ("%s", Dumper({got => $got, expected => $expected}));
     }
-    # printf STDERR ("BYE NOW\n");
 }
 
 sub test_eval {
-    my $duk = JavaScript::V8::XS->new();
-    ok($duk, "created JavaScript::V8::XS object");
+    my $vm = $CLASS->new();
+    ok($vm, "created $CLASS object");
 
     my $callback = sub {
         printf("HOI [%s]\n", join(",", map +(defined $_ ? $_ : "UNDEF"), @_));
         return scalar @_;
     };
-    $duk->set('gonzo' => $callback);
+    $vm->set('gonzo' => $callback);
     my @commands = (
         [ "'gonzo'" => 'gonzo' ],
         [ "3+4*5"   => 23 ],
@@ -83,7 +82,7 @@ sub test_eval {
 
         my $output = '';
         my $got;
-        stdout_like sub { $got = $duk->eval($js); },
+        stdout_like sub { $got = $vm->eval($js); },
                     qr/$expected_output/,
                     "got correct stdout from [$js]";
         is_deeply($got, $expected_return, "eval return [$js]");
@@ -91,8 +90,8 @@ sub test_eval {
 }
 
 sub test_roundtrip {
-    my $duk = JavaScript::V8::XS->new();
-    ok($duk, "created JavaScript::V8::XS object");
+    my $vm = $CLASS->new();
+    ok($vm, "created $CLASS object");
 
     my $test_name;
     my $expected_args;
@@ -101,7 +100,7 @@ sub test_roundtrip {
             or printf STDERR Dumper({ got => \@_, expected => $expected_args });
         return $expected_args;
     };
-    $duk->set('perl_test' => $callback);
+    $vm->set('perl_test' => $callback);
     my %args = (
         'empty' => [],
         'undef' => [undef],
@@ -113,17 +112,17 @@ sub test_roundtrip {
     foreach my $name (sort keys %args) {
         my $args = $args{$name};
 
-        $duk->set($name, $args);
-        my $got_set = $duk->get($name);
+        $vm->set($name, $args);
+        my $got_set = $vm->get($name);
         is_deeply($got_set, $args, "set / get works for $name");
 
         my $js_name = "js_$name";
         $test_name = $name;
         $expected_args = $args;
-        my $got_eval = $duk->eval("$js_name = perl_test.apply(this, $name)");
+        my $got_eval = $vm->eval("$js_name = perl_test.apply(this, $name)");
         is_deeply($got_eval, $args, "calling perl_test() works for $name");
 
-        my $got_get = $duk->get($js_name);
+        my $got_get = $vm->get($js_name);
         is_deeply($got_get, $args, "return value from perl_test() works for $name");
     }
 }
