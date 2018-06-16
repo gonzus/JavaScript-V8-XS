@@ -3,6 +3,8 @@
 #include "V8Context.h"
 #include "pl_v8.h"
 
+#define PL_GC_RUNS 2
+
 using namespace v8;
 
 struct FuncData {
@@ -614,7 +616,8 @@ int pl_run_gc(V8Context* ctx)
 
     while (1) {
         ++runs;
-        if (!ctx->isolate->IdleNotificationDeadline(1)) {
+        bool go_on = ctx->isolate->IdleNotificationDeadline(1);
+        if (runs >= PL_GC_RUNS || !go_on) {
             break;
         }
     }
