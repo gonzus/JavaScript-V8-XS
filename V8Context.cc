@@ -179,6 +179,11 @@ SV* V8Context::eval(const char* code, const char* file)
     return ret;
 }
 
+int V8Context::run_gc()
+{
+    return pl_run_gc(this);
+}
+
 #if 0
 Handle<Array> V8Context::CreateArray(int nested)
 {

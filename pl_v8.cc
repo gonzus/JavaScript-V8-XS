@@ -3,8 +3,6 @@
 #include "V8Context.h"
 #include "pl_v8.h"
 
-// #define PL_GC_RUNS 2
-
 using namespace v8;
 
 struct FuncData {
@@ -608,25 +606,17 @@ SV* pl_eval(pTHX_ Duk* duk, const char* js, const char* file)
     duk_pop(ctx);
     return ret;
 }
-
-int pl_run_gc(Duk* duk)
-{
-    int j = 0;
-
-    /*
-     * From docs in http://duktape.org/api.html#duk_gc
-     *
-     * You may want to call this function twice to ensure even objects with
-     * finalizers are collected.  Currently it takes two mark-and-sweep rounds
-     * to collect such objects.  First round marks the object as finalizable
-     * and runs the finalizer.  Second round ensures the object is still
-     * unreachable after finalization and then frees the object.
-     */
-    duk_context* ctx = duk->ctx;
-    for (j = 0; j < PL_GC_RUNS; ++j) {
-        /* DUK_GC_COMPACT: Force object property table compaction */
-        duk_gc(ctx, DUK_GC_COMPACT);
-    }
-    return PL_GC_RUNS;
-}
 #endif
+
+int pl_run_gc(V8Context* ctx)
+{
+    int runs = 0;
+
+    while (1) {
+        ++runs;
+        if (!ctx->isolate->IdleNotificationDeadline(1)) {
+            break;
+        }
+    }
+    return runs;
+}

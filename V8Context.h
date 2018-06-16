@@ -19,6 +19,8 @@ class V8Context {
         void set(const char* name, SV* value);
         SV* eval(const char* code, const char* file = 0);
 
+        int run_gc();
+
         Isolate* isolate;
         Persistent<Context> persistent_context;
         Persistent<ObjectTemplate> persistent_template;
