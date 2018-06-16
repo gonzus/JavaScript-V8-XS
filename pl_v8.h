@@ -61,6 +61,7 @@ SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name);
 int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value);
 
 SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name);
+SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name);
 
 #if 0
 /*

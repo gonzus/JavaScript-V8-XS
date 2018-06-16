@@ -14,6 +14,7 @@ class V8Context {
 
         SV* get(const char* name);
         SV* exists(const char* name);
+        SV* typeof(const char* name);
 
         void set(const char* name, SV* value);
         SV* eval(const char* code, const char* file = 0);
