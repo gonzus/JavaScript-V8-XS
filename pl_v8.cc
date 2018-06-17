@@ -612,14 +612,9 @@ SV* pl_eval(pTHX_ Duk* duk, const char* js, const char* file)
 
 int pl_run_gc(V8Context* ctx)
 {
-    int runs = 0;
-
-    while (1) {
-        ++runs;
-        bool go_on = ctx->isolate->IdleNotificationDeadline(1);
-        if (runs >= PL_GC_RUNS || !go_on) {
-            break;
-        }
+    // Run PL_GC_RUNS GC rounds
+    for (int j = 0; j < PL_GC_RUNS; ++j) {
+        ctx->isolate->LowMemoryNotification();
     }
-    return runs;
+    return PL_GC_RUNS;
 }
