@@ -15,6 +15,8 @@ struct FuncData {
     SV* func;
 };
 
+static bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object);
+
 static void perl_caller(const FunctionCallbackInfo<Value>& args)
 {
     Local<Function> v8_func = Local<Function>::Cast(args.This());
@@ -541,39 +543,10 @@ SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
-    int start = 0;
-    Local<Object> parent = context->Global();
-    bool found = false;
-    // fprintf(stderr, "TYPEOF [%s]\n", name);
-    while (1) {
-        int pos = start;
-        while (name[pos] != '\0' && name[pos] != '.') {
-            ++pos;
-        }
-        int length = pos - start;
-        if (length <= 0) {
-            break;
-        }
-        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name + start, NewStringType::kNormal, length).ToLocalChecked();
-        // fprintf(stderr, "TYPEOF %3d %3d %3d [%*.*s]\n", start, pos, length, length, length, name + start);
-        if (!parent->Has(v8_name)) {
-            break;
-        }
-        Local<Value> child = parent->Get(v8_name);
-        parent = Local<Object>::Cast(child);
-        if (name[pos] == '\0') {
-            // final element
-            found = true;
-            break;
-        }
-        if (!child->IsObject()) {
-            // child is not an object, can't go on
-            break;
-        }
-        start = pos + 1;
-    }
+    Local<Object> object;
+    bool found = find_object(ctx, name, context, object);
     if (found) {
-        cstr = get_typeof(ctx, parent);
+        cstr = get_typeof(ctx, object);
     }
 
     STRLEN clen = 0;
@@ -639,4 +612,41 @@ int pl_run_gc(V8Context* ctx)
         ctx->isolate->LowMemoryNotification();
     }
     return PL_GC_RUNS;
+}
+
+static bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object)
+{
+    int start = 0;
+    object = context->Global();
+    bool found = false;
+    // fprintf(stderr, "FIND [%s]\n", name);
+    while (1) {
+        int pos = start;
+        while (name[pos] != '\0' && name[pos] != '.') {
+            ++pos;
+        }
+        int length = pos - start;
+        if (length <= 0) {
+            break;
+        }
+        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name + start, NewStringType::kNormal, length).ToLocalChecked();
+        // fprintf(stderr, "FIND %3d %3d %3d [%*.*s]\n", start, pos, length, length, length, name + start);
+        if (!object->Has(v8_name)) {
+            break;
+        }
+        Local<Value> child = object->Get(v8_name);
+        object = Local<Object>::Cast(child);
+        if (name[pos] == '\0') {
+            // final element
+            found = true;
+            break;
+        }
+        if (!child->IsObject()) {
+            // child is not an object, can't go on
+            break;
+        }
+        start = pos + 1;
+    }
+
+    return found;
 }
