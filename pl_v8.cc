@@ -16,6 +16,7 @@ struct FuncData {
 };
 
 static bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object);
+static const char* get_typeof(V8Context* ctx, const Handle<Object>& object);
 
 static void perl_caller(const FunctionCallbackInfo<Value>& args)
 {
@@ -392,20 +393,10 @@ SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name)
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
-    int len = 0;
-    int last_dot = find_last_dot(name, &len);
-    if (last_dot < 0) {
-        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name, NewStringType::kNormal).ToLocalChecked();
-        if (context->Global()->Has(v8_name)) {
-            Local<Value> value = context->Global()->Get(v8_name);
-            Handle<Object> object = Local<Object>::Cast(value);
-            ret = pl_v8_to_perl(aTHX_ ctx, object);
-        }
-        else {
-            fprintf(stderr, "SYMBOL [%s] MISSING\n", name);
-        }
-    } else {
-        // TODO
+    Local<Object> object;
+    bool found = find_object(ctx, name, context, object);
+    if (found) {
+        ret = pl_v8_to_perl(aTHX_ ctx, object);
     }
 
     return ret;
@@ -452,81 +443,6 @@ SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name)
     }
 
     return ret;
-}
-
-static const char* get_typeof(V8Context* ctx, const Handle<Object>& object)
-{
-    const char* label = "undefined";
-
-    if (object->IsUndefined()) {
-    }
-    else if (object->IsNull()) {
-        label = "null";
-    }
-    else if (object->IsBoolean()) {
-        label = "boolean";
-    }
-    else if (object->IsNumber()) {
-        label = "number";
-    }
-    else if (object->IsString()) {
-        label = "string";
-    }
-    else if (object->IsArray()) {
-        label = "array";
-    }
-    else if (object->IsSymbol()) {
-        label = "symbol";
-    }
-    else if (object->IsExternal()) {
-        label = "pointer";
-    }
-    else if (object->IsFunction()) {
-        label = "function";
-    }
-    else if (object->IsObject()) {
-        label = "object";
-    }
-
-    return label;
-
-#if 0
-    if (v->IsArgumentsObject()  ) result |= 0x0000000000000001;
-    if (v->IsArrayBuffer()      ) result |= 0x0000000000000002;
-    if (v->IsArrayBufferView()  ) result |= 0x0000000000000004;
-    if (v->IsBooleanObject()    ) result |= 0x0000000000000010;
-    if (v->IsDataView()         ) result |= 0x0000000000000040;
-    if (v->IsDate()             ) result |= 0x0000000000000080;
-    if (v->IsFalse()            ) result |= 0x0000000000000200;
-    if (v->IsFloat32Array()     ) result |= 0x0000000000000400;
-    if (v->IsFloat64Array()     ) result |= 0x0000000000000800;
-    if (v->IsGeneratorFunction()) result |= 0x0000000000002000;
-    if (v->IsGeneratorObject()  ) result |= 0x0000000000004000;
-    if (v->IsInt16Array()       ) result |= 0x0000000000008000;
-    if (v->IsInt32Array()       ) result |= 0x0000000000010000;
-    if (v->IsInt32()            ) result |= 0x0000000000020000;
-    if (v->IsInt8Array()        ) result |= 0x0000000000040000;
-    if (v->IsMapIterator()      ) result |= 0x0000000000080000;
-    if (v->IsMap()              ) result |= 0x0000000000100000;
-    if (v->IsName()             ) result |= 0x0000000000200000;
-    if (v->IsNativeError()      ) result |= 0x0000000000400000;
-    if (v->IsNumberObject()     ) result |= 0x0000000001000000;
-    if (v->IsPromise()          ) result |= 0x0000000008000000;
-    if (v->IsRegExp()           ) result |= 0x0000000010000000;
-    if (v->IsSetIterator()      ) result |= 0x0000000020000000;
-    if (v->IsSet()              ) result |= 0x0000000040000000;
-    if (v->IsStringObject()     ) result |= 0x0000000080000000;
-    if (v->IsSymbolObject()     ) result |= 0x0000000200000000;
-    if (v->IsTrue()             ) result |= 0x0000000800000000;
-    if (v->IsTypedArray()       ) result |= 0x0000001000000000;
-    if (v->IsUint16Array()      ) result |= 0x0000002000000000;
-    if (v->IsUint32Array()      ) result |= 0x0000004000000000;
-    if (v->IsUint32()           ) result |= 0x0000008000000000;
-    if (v->IsUint8Array()       ) result |= 0x0000010000000000;
-    if (v->IsUint8ClampedArray()) result |= 0x0000020000000000;
-    if (v->IsWeakMap()          ) result |= 0x0000080000000000;
-    if (v->IsWeakSet()          ) result |= 0x0000100000000000;
-#endif
 }
 
 SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
@@ -645,4 +561,79 @@ static bool find_object(V8Context* ctx, const char* name, Local<Context>& contex
     }
 
     return found;
+}
+
+static const char* get_typeof(V8Context* ctx, const Handle<Object>& object)
+{
+    const char* label = "undefined";
+
+    if (object->IsUndefined()) {
+    }
+    else if (object->IsNull()) {
+        label = "null";
+    }
+    else if (object->IsBoolean()) {
+        label = "boolean";
+    }
+    else if (object->IsNumber()) {
+        label = "number";
+    }
+    else if (object->IsString()) {
+        label = "string";
+    }
+    else if (object->IsArray()) {
+        label = "array";
+    }
+    else if (object->IsSymbol()) {
+        label = "symbol";
+    }
+    else if (object->IsExternal()) {
+        label = "pointer";
+    }
+    else if (object->IsFunction()) {
+        label = "function";
+    }
+    else if (object->IsObject()) {
+        label = "object";
+    }
+
+    return label;
+
+#if 0
+    if (v->IsArgumentsObject()  ) result |= 0x0000000000000001;
+    if (v->IsArrayBuffer()      ) result |= 0x0000000000000002;
+    if (v->IsArrayBufferView()  ) result |= 0x0000000000000004;
+    if (v->IsBooleanObject()    ) result |= 0x0000000000000010;
+    if (v->IsDataView()         ) result |= 0x0000000000000040;
+    if (v->IsDate()             ) result |= 0x0000000000000080;
+    if (v->IsFalse()            ) result |= 0x0000000000000200;
+    if (v->IsFloat32Array()     ) result |= 0x0000000000000400;
+    if (v->IsFloat64Array()     ) result |= 0x0000000000000800;
+    if (v->IsGeneratorFunction()) result |= 0x0000000000002000;
+    if (v->IsGeneratorObject()  ) result |= 0x0000000000004000;
+    if (v->IsInt16Array()       ) result |= 0x0000000000008000;
+    if (v->IsInt32Array()       ) result |= 0x0000000000010000;
+    if (v->IsInt32()            ) result |= 0x0000000000020000;
+    if (v->IsInt8Array()        ) result |= 0x0000000000040000;
+    if (v->IsMapIterator()      ) result |= 0x0000000000080000;
+    if (v->IsMap()              ) result |= 0x0000000000100000;
+    if (v->IsName()             ) result |= 0x0000000000200000;
+    if (v->IsNativeError()      ) result |= 0x0000000000400000;
+    if (v->IsNumberObject()     ) result |= 0x0000000001000000;
+    if (v->IsPromise()          ) result |= 0x0000000008000000;
+    if (v->IsRegExp()           ) result |= 0x0000000010000000;
+    if (v->IsSetIterator()      ) result |= 0x0000000020000000;
+    if (v->IsSet()              ) result |= 0x0000000040000000;
+    if (v->IsStringObject()     ) result |= 0x0000000080000000;
+    if (v->IsSymbolObject()     ) result |= 0x0000000200000000;
+    if (v->IsTrue()             ) result |= 0x0000000800000000;
+    if (v->IsTypedArray()       ) result |= 0x0000001000000000;
+    if (v->IsUint16Array()      ) result |= 0x0000002000000000;
+    if (v->IsUint32Array()      ) result |= 0x0000004000000000;
+    if (v->IsUint32()           ) result |= 0x0000008000000000;
+    if (v->IsUint8Array()       ) result |= 0x0000010000000000;
+    if (v->IsUint8ClampedArray()) result |= 0x0000020000000000;
+    if (v->IsWeakMap()          ) result |= 0x0000080000000000;
+    if (v->IsWeakSet()          ) result |= 0x0000100000000000;
+#endif
 }
