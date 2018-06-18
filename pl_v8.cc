@@ -445,16 +445,12 @@ SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name)
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
-    int len = 0;
-    int last_dot = find_last_dot(name, &len);
-    if (last_dot < 0) {
-        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name, NewStringType::kNormal).ToLocalChecked();
-        if (context->Global()->Has(v8_name)) {
-            ret = &PL_sv_yes;
-        }
-    } else {
-        // TODO
+    Local<Object> object;
+    bool found = find_object(ctx, name, context, object);
+    if (found) {
+        ret = &PL_sv_yes;
     }
+
     return ret;
 }
 
