@@ -15,6 +15,7 @@ struct FuncData {
     SV* func;
 };
 
+static bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object, Local<Value>& slot);
 static bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object);
 static const char* get_typeof(V8Context* ctx, const Handle<Object>& object);
 
@@ -412,15 +413,13 @@ int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value)
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
-    int len = 0;
-    int last_dot = find_last_dot(name, &len);
-    if (last_dot < 0) {
-        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name, NewStringType::kNormal).ToLocalChecked();
-        Handle<Object> object = pl_perl_to_v8(aTHX_ value, ctx);
-        context->Global()->Set(v8_name, object);
+    Local<Object> object;
+    Local<Value> slot;
+    bool found = find_parent(ctx, name, context, object, slot);
+    if (found) {
+        Handle<Object> v8_value = pl_perl_to_v8(aTHX_ value, ctx);
+        object->Set(slot, v8_value);
         ret = 1;
-    } else {
-        // TODO
     }
 
     return ret;
@@ -524,6 +523,44 @@ int pl_run_gc(V8Context* ctx)
         ctx->isolate->LowMemoryNotification();
     }
     return PL_GC_RUNS;
+}
+
+static bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object, Local<Value>& slot)
+{
+    int start = 0;
+    object = context->Global();
+    bool found = false;
+    // fprintf(stderr, "FIND [%s]\n", name);
+    while (1) {
+        int pos = start;
+        while (name[pos] != '\0' && name[pos] != '.') {
+            ++pos;
+        }
+        int length = pos - start;
+        if (length <= 0) {
+            break;
+        }
+        // fprintf(stderr, "FIND %3d %3d %3d [%*.*s]\n", start, pos, length, length, length, name + start);
+        slot = String::NewFromUtf8(ctx->isolate, name + start, NewStringType::kNormal, length).ToLocalChecked();
+        if (name[pos] == '\0') {
+            // final element
+            found = true;
+            break;
+        }
+        if (!object->Has(slot)) {
+            // object doesn't have a slot with that name
+            break;
+        }
+        Local<Value> child = object->Get(slot);
+        object = Local<Object>::Cast(child);
+        if (!child->IsObject()) {
+            // child is not an object
+            break;
+        }
+        start = pos + 1;
+    }
+
+    return found;
 }
 
 static bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object)
