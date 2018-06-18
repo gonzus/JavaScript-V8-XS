@@ -310,7 +310,10 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
                     //  croak("Could not create JS element for hash\n");
 
                     Local<Value> v8_key = String::NewFromUtf8(ctx->isolate, kstr, NewStringType::kNormal).ToLocalChecked();
-                    object->Set(context, v8_key, nested);
+                    Maybe<bool> check = object->Set(context, v8_key, nested);
+                    if (check.IsNothing() || !check.FromMaybe(false)) {
+                        croak("Could not set JS element for object\n");
+                    }
                 }
             }
         } else if (SvTYPE(ref) == SVt_PVCV) {
