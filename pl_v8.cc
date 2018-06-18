@@ -541,17 +541,39 @@ SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
-    int len = 0;
-    int last_dot = find_last_dot(name, &len);
-    if (last_dot < 0) {
-        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name, NewStringType::kNormal).ToLocalChecked();
-        if (context->Global()->Has(v8_name)) {
-            Local<Value> value = context->Global()->Get(v8_name);
-            Handle<Object> object = Local<Object>::Cast(value);
-            cstr = get_typeof(ctx, object);
+    int start = 0;
+    Local<Object> parent = context->Global();
+    bool found = false;
+    // fprintf(stderr, "TYPEOF [%s]\n", name);
+    while (1) {
+        int pos = start;
+        while (name[pos] != '\0' && name[pos] != '.') {
+            ++pos;
         }
-    } else {
-        // TODO
+        int length = pos - start;
+        if (length <= 0) {
+            break;
+        }
+        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name + start, NewStringType::kNormal, length).ToLocalChecked();
+        // fprintf(stderr, "TYPEOF %3d %3d %3d [%*.*s]\n", start, pos, length, length, length, name + start);
+        if (!parent->Has(v8_name)) {
+            break;
+        }
+        Local<Value> child = parent->Get(v8_name);
+        parent = Local<Object>::Cast(child);
+        if (name[pos] == '\0') {
+            // final element
+            found = true;
+            break;
+        }
+        if (!child->IsObject()) {
+            // child is not an object, can't go on
+            break;
+        }
+        start = pos + 1;
+    }
+    if (found) {
+        cstr = get_typeof(ctx, parent);
     }
 
     STRLEN clen = 0;
