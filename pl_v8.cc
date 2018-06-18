@@ -533,7 +533,6 @@ static bool find_parent(V8Context* ctx, const char* name, Local<Context>& contex
     int start = 0;
     object = context->Global();
     bool found = false;
-    // fprintf(stderr, "FIND [%s]\n", name);
     while (1) {
         int pos = start;
         while (name[pos] != '\0' && name[pos] != '.') {
@@ -541,12 +540,12 @@ static bool find_parent(V8Context* ctx, const char* name, Local<Context>& contex
         }
         int length = pos - start;
         if (length <= 0) {
+            // invalid name
             break;
         }
-        // fprintf(stderr, "FIND %3d %3d %3d [%*.*s]\n", start, pos, length, length, length, name + start);
         slot = String::NewFromUtf8(ctx->isolate, name + start, NewStringType::kNormal, length).ToLocalChecked();
         if (name[pos] == '\0') {
-            // final element
+            // final element, we are done
             found = true;
             break;
         }
@@ -557,7 +556,7 @@ static bool find_parent(V8Context* ctx, const char* name, Local<Context>& contex
         Local<Value> child = object->Get(slot);
         object = Local<Object>::Cast(child);
         if (!child->IsObject()) {
-            // child is not an object
+            // child in slot is not an object
             break;
         }
         start = pos + 1;
