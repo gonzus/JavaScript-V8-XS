@@ -568,39 +568,18 @@ static bool find_parent(V8Context* ctx, const char* name, Local<Context>& contex
 
 static bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object)
 {
-    int start = 0;
-    object = context->Global();
-    bool found = false;
-    // fprintf(stderr, "FIND [%s]\n", name);
-    while (1) {
-        int pos = start;
-        while (name[pos] != '\0' && name[pos] != '.') {
-            ++pos;
-        }
-        int length = pos - start;
-        if (length <= 0) {
-            break;
-        }
-        Local<Value> v8_name = String::NewFromUtf8(ctx->isolate, name + start, NewStringType::kNormal, length).ToLocalChecked();
-        // fprintf(stderr, "FIND %3d %3d %3d [%*.*s]\n", start, pos, length, length, length, name + start);
-        if (!object->Has(v8_name)) {
-            break;
-        }
-        Local<Value> child = object->Get(v8_name);
-        object = Local<Object>::Cast(child);
-        if (name[pos] == '\0') {
-            // final element
-            found = true;
-            break;
-        }
-        if (!child->IsObject()) {
-            // child is not an object, can't go on
-            break;
-        }
-        start = pos + 1;
+    Local<Value> slot;
+    if (!find_parent(ctx, name, context, object, slot)) {
+        // could not find parent
+        return false;
     }
-
-    return found;
+    if (!object->Has(slot)) {
+        // parent doesn't have a slot with that name
+        return false;
+    }
+    Local<Value> child = object->Get(slot);
+    object = Local<Object>::Cast(child);
+    return true;
 }
 
 static const char* get_typeof(V8Context* ctx, const Handle<Object>& object)
