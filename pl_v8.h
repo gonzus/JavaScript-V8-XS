@@ -6,6 +6,7 @@
 
 class V8Context;
 
+#if 0
 #define V8_OPT_NAME_GATHER_STATS      "gather_stats"
 #define V8_OPT_NAME_SAVE_MESSAGES     "save_messages"
 #define V8_OPT_NAME_MAX_MEMORY_BYTES  "max_memory_bytes"
@@ -16,29 +17,12 @@ class V8Context;
 #define V8_OPT_FLAG_MAX_MEMORY_BYTES  0x04
 #define V8_OPT_FLAG_MAX_TIMEOUT_US    0x08
 
-#if 0
 #define PL_NAME_ROOT              "_perl_"
 #define PL_NAME_GENERIC_CALLBACK  "generic_callback"
 
 #define PL_SLOT_CREATE(name)      (PL_NAME_ROOT "." #name)
 
 #define PL_SLOT_GENERIC_CALLBACK  PL_SLOT_CREATE(PL_NAME_GENERIC_CALLBACK)
-
-/*
- * This is our internal data structure.  For now it only contains a pointer to
- * a duktape context.  We will add other stuff here.
- */
-typedef struct Duk {
-    duk_context* ctx;
-    int pagesize_bytes;
-    unsigned long flags;
-    HV* stats;
-    HV* msgs;
-    size_t total_allocated_bytes;
-    size_t max_allocated_bytes;
-    double max_timeout_us;;
-    double eval_start_us;
-} Duk;
 #endif
 
 /*
@@ -57,18 +41,37 @@ typedef struct Duk {
 SV* pl_v8_to_perl(pTHX_ V8Context* ctx, const v8::Handle<v8::Object>& object);
 const v8::Handle<v8::Object> pl_perl_to_v8(pTHX_ SV* value, V8Context* ctx);
 
+/*
+ * Get the JS value of a global / nested property as Perl data.
+ */
 SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name);
-int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value);
 
+/*
+ * Return true if a given global / nested property exists.
+ */
 SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name);
+
+/*
+ * Get the JS type of a global / nested property as a Perl string.
+ */
 SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name);
 
-#if 0
 /*
- * Return a Perl string with the type of the duktape variable
+ * Set the JS value of a global / nested property from Perl data.
  */
-const char* pl_typeof(pTHX_ duk_context* ctx, int pos);
+int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value);
 
+/*
+ * Run a piece of JS code, associated with an (optional) file name.
+ */
+SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file = 0);
+
+/*
+ * Run the V8 GC
+ */
+int pl_run_gc(V8Context* ctx);
+
+#if 0
 /*
  * This is a generic dispatcher that allows calling any Perl function from JS.
  */
@@ -76,11 +79,6 @@ int pl_call_perl_sv(duk_context* ctx, SV* func);
 
 /* Get / set the value for a global object or a slot in an object */
 SV* pl_instanceof_global_or_property(pTHX_ duk_context* ctx, const char* object, const char* class);
-SV* pl_eval(pTHX_ Duk* duk, const char* js, const char* file);
-
 #endif
-
-/* Run the V8 GC */
-int pl_run_gc(V8Context* ctx);
 
 #endif

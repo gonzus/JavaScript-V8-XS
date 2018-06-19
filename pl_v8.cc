@@ -483,41 +483,33 @@ SV* pl_instanceof_global_or_property(pTHX_ duk_context* ctx, const char* object,
     }
     return ret;
 }
+#endif
 
-SV* pl_eval(pTHX_ Duk* duk, const char* js, const char* file)
+SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
 {
-    SV* ret = &PL_sv_undef; /* return undef by default */
-    duk_context* ctx = duk->ctx;
-    Stats stats;
-    duk_uint_t flags = 0;
-    duk_int_t rc = 0;
+    Isolate::Scope isolate_scope(ctx->isolate);
+    HandleScope handle_scope(ctx->isolate);
 
-    /* flags |= DUK_COMPILE_STRICT; */
+    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Context::Scope context_scope(context);
 
-    pl_stats_start(aTHX_ duk, &stats);
-    if (!file) {
-        rc = duk_pcompile_string(ctx, flags, js);
-    }
-    else {
-        duk_push_string(ctx, file);
-        rc = duk_pcompile_string_filename(ctx, flags, js);
-    }
-    pl_stats_stop(aTHX_ duk, &stats, "compile");
+    // Create a string containing the JavaScript source code.
+    Local<String> source =
+        String::NewFromUtf8(ctx->isolate, code, NewStringType::kNormal)
+        .ToLocalChecked();
 
-    if (rc != DUK_EXEC_SUCCESS) {
-        croak("JS could not compile code: %s\n", duk_safe_to_string(ctx, -1));
-    }
+    // Compile the source code.
+    Local<Script> script =
+        Script::Compile(context, source).ToLocalChecked();
 
-    pl_stats_start(aTHX_ duk, &stats);
-    rc = duk_pcall(ctx, 0);
-    pl_stats_stop(aTHX_ duk, &stats, "run");
-    check_duktape_call_for_errors(rc, ctx);
+    // Run the script to get the result.
+    Local<Value> result = script->Run(context).ToLocalChecked();
+    Handle<Object> object = Local<Object>::Cast(result);
 
-    ret = pl_duk_to_perl(aTHX_ ctx, -1);
-    duk_pop(ctx);
+    // Convert the result into Perl data
+    SV* ret = pl_v8_to_perl(aTHX_ ctx, object);
     return ret;
 }
-#endif
 
 int pl_run_gc(V8Context* ctx)
 {

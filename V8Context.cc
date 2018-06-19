@@ -138,51 +138,7 @@ void V8Context::set(const char* name, SV* value)
 
 SV* V8Context::eval(const char* code, const char* file)
 {
-    // Isolate::Scope isolate_scope(isolate);
-    HandleScope handle_scope(isolate);
-
-    // fprintf(stderr, "creating copy of context\n");
-    Local<Context> context = Local<Context>::New(isolate, persistent_context);
-    Context::Scope context_scope(context);
-    // fprintf(stderr, "created copy of context\n");
-
-#if 1
-    // fprintf(stderr, "COMPILE:<\n%s\n>\n", code);
-    // Create a string containing the JavaScript source code.
-    Local<String> source =
-        String::NewFromUtf8(isolate, code, NewStringType::kNormal)
-        .ToLocalChecked();
-
-    // Compile the source code.
-    Local<Script> script =
-        Script::Compile(context, source).ToLocalChecked();
-
-    // Run the script to get the result.
-    Local<Value> result = script->Run(context).ToLocalChecked();
-#endif
-
-    // Convert the result to an UTF8 string and print it.
-    String::Utf8Value utf8(isolate, result);
-    // fprintf(stderr, "GONZO: [%s]\n", *utf8);
-
-#if 0
-    Handle<Array> a = CreateArray(2);
-    fprintf(stderr, "GONZO: GOT ARRAY with %d elements\n", a->Length());
-    DumpObject(a);
-
-    Handle<Object> o = CreateObject(2);
-    fprintf(stderr, "GONZO: GOT OBJECT\n");
-    DumpObject(o);
-#endif
-
-    SV* ret = &PL_sv_undef; /* return undef by default */
-#if 1
-    // fprintf(stderr, "Script run\n");
-    Handle<Object> object = Local<Object>::Cast(result);
-    // fprintf(stderr, "Created object\n");
-    ret = pl_v8_to_perl(aTHX_ this, object);
-#endif
-    return ret;
+    return pl_eval(aTHX_ this, code, file);
 }
 
 int V8Context::run_gc()
