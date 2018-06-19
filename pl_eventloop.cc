@@ -8,8 +8,8 @@
 #include "pl_util.h"
 #include "pl_eventloop.h"
 
-#if !defined(GONZO_DEBUG)
-#define GONZO_DEBUG 0       /* set to 1 to debug with printf */
+#if !defined(EVENTLOOP_DEBUG)
+#define EVENTLOOP_DEBUG 0       /* set to 1 to debug with printf */
 #endif
 
 #define  MIN_DELAY              1.0
@@ -120,7 +120,7 @@ static void expire_timers(V8Context* ctx) {
          *  timer being expired has been moved to 'timer_expiring', we don't
          *  need to worry about the timer's offset changing on the timer list.
          */
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
         fprintf(stderr, "calling user callback for timer id %d\n", (int) t->id);
         fflush(stderr);
 #endif
@@ -129,16 +129,8 @@ static void expire_timers(V8Context* ctx) {
         Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
         Context::Scope context_scope(context);
 
-
-
-
-
         Local<Value> global = context->Global();
-        uint64_t mask = V8Context::GetTypeFlags(global);
-        // fprintf(stderr, "MASK %llx\n", mask);
-
         Local<Function> v8_func = Local<Function>::New(ctx->isolate, t->v8_func);
-        // fprintf(stderr, "FUNC script id %ld\n", (long) v8_func->ScriptId());
 
         TryCatch try_catch(ctx->isolate);
         Local<Value> result;
@@ -147,14 +139,14 @@ static void expire_timers(V8Context* ctx) {
             fprintf(stderr, "%s\n", *error);
         }
 
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
         fprintf(stderr, "called user callback for timer id %d\n", (int) t->id);
         fflush(stderr);
 #endif
 
         if (t->removed) {
             /* One-shot timer (always removed) or removed by user callback. */
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
             fprintf(stderr, "callback deleted timer %d\n", (int) t->id);
             fflush(stderr);
 #endif
@@ -162,12 +154,12 @@ static void expire_timers(V8Context* ctx) {
             /* Interval timer, not removed by user callback.  Queue back to
              * timer list and bubble to its final sorted position.
              */
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
             fprintf(stderr, "queueing timer %d back into active list\n", (int) t->id);
             fflush(stderr);
 #endif
             if (timer_count >= MAX_TIMERS) {
-                // TODO
+                // TODO error out of here
                 fprintf(stderr, "out of timer slots");
                 fflush(stderr);
             }
@@ -208,7 +200,7 @@ int eventloop_run(V8Context* ctx) {
             }
             timeout = (int) diff;  /* clamping ensures that fits */
         } else {
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
             fprintf(stderr, "no timers to poll, exiting\n");
             fflush(stderr);
 #endif
@@ -218,12 +210,12 @@ int eventloop_run(V8Context* ctx) {
         /*
          *  Poll for timeout.
          */
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
         fprintf(stderr, "going to poll, timeout %d ms\n", timeout);
         fflush(stderr);
 #endif
         rc = poll(0, 0, timeout);
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
         fprintf(stderr, "poll rc: %d\n", rc);
         fflush(stderr);
 #endif
@@ -242,11 +234,11 @@ int eventloop_run(V8Context* ctx) {
 static void create_timer(const FunctionCallbackInfo<Value>& args)
 {
     if (timer_count >= MAX_TIMERS) {
-        // FUCK YOU
+        // TODO: error out of here
         abort();
     }
     if (args.Length() != 3) {
-        // FUCK YOU
+        // TODO: error out of here
         abort();
     }
 
@@ -254,15 +246,12 @@ static void create_timer(const FunctionCallbackInfo<Value>& args)
     Local<Function> v8_func    = Local<Function>::Cast(args[0]);
     Local<Value>    v8_delay   = Local<Value>::Cast(args[1]);
     Local<Value>    v8_oneshot = Local<Value>::Cast(args[2]);
-    // fprintf(stderr, "ARG0 %s a function\n", v8_func->IsFunction() ? "is" : "is not");
-    // fprintf(stderr, "ARG0 script id %ld\n", (long) v8_func->ScriptId());
 
     double delay = v8_delay->NumberValue();
     if (delay < MIN_DELAY) {
         delay = MIN_DELAY;
     }
     bool oneshot =  v8_oneshot->BooleanValue();
-    // fprintf(stderr, "ARG1 = %f, ARG2 = %d\n", delay, oneshot);
 
     int idx = timer_count++;
     int64_t timer_id = timer_next_id++;
@@ -283,7 +272,7 @@ static void create_timer(const FunctionCallbackInfo<Value>& args)
     bubble_last_timer();
 
     /* Return timer id. */
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
     fprintf(stderr, "created timer id: %lld\n", timer_id);
     fflush(stderr);
 #endif
@@ -293,7 +282,7 @@ static void create_timer(const FunctionCallbackInfo<Value>& args)
 static void delete_timer(const FunctionCallbackInfo<Value>& args)
 {
     if (args.Length() != 1) {
-        // FUCK YOU
+        // TODO: error out of here
         abort();
     }
 
@@ -316,7 +305,7 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
     ev_timer* t = &timer_expiring;
     if (t->id == timer_id) {
         t->removed = 1;
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
         fprintf(stderr, "deleted expiring timer id: %lld\n", timer_id);
         fflush(stderr);
 #endif
@@ -345,7 +334,7 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
             /* Update timer_count. */
             timer_count--;
 
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
             fprintf(stderr, "deleted timer id: %lld\n", timer_id);
             fflush(stderr);
 #endif
@@ -354,7 +343,7 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
         }
     }
 
-#if GONZO_DEBUG > 0
+#if EVENTLOOP_DEBUG > 0
     if (!found) {
         fprintf(stderr, "trying to delete timer id %lld, but not found; ignoring\n", timer_id);
         fflush(stderr);
@@ -370,6 +359,7 @@ int pl_register_eventloop_functions(V8Context* ctx, Local<ObjectTemplate>& objec
         const char* name;
         Handler func;
     } data[] = {
+        // TODO: these should be functions inside an object EventLoop
         { "EventLoop_createTimer", create_timer },
         { "EventLoop_deleteTimer", delete_timer },
     };
@@ -384,18 +374,14 @@ int pl_register_eventloop_functions(V8Context* ctx, Local<ObjectTemplate>& objec
 
 SV* pl_run_function_in_event_loop(pTHX_ V8Context* ctx, const char* func)
 {
-    SV* ret = &PL_sv_no; /* return false by default */
-
     /* Start a zero timer which will call our function from the event loop. */
+    // TODO: stop using a fixed size buffer
     char js[1024];
     sprintf(js, "setTimeout(function() { %s(); }, 0);", func);
     pl_eval(aTHX_ ctx, js);
 
-    // fprintf(stderr, "RUNNING eventloop\n");
     /* Launch eventloop; this call only returns after the eventloop terminates. */
     int rc = eventloop_run(ctx);
-    // fprintf(stderr, "FINISHED eventloop\n");
-    ret = &PL_sv_yes;
 
-    return ret;
+    return &PL_sv_yes;
 }
