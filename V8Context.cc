@@ -1,49 +1,10 @@
 #include "libplatform/libplatform.h"
 #include "pl_util.h"
+#include "pl_native.h"
 #include "V8Context.h"
 
 int V8Context::instance_count = 0;
 std::unique_ptr<Platform> V8Context::platform = 0;
-
-// Extracts a C string from a V8 Utf8Value.
-static const char* ToCString(const String::Utf8Value& value)
-{
-    return *value ? *value : "<string conversion failed>";
-}
-
-// The callback that is invoked by v8 whenever the JavaScript 'print'
-// function is called.  Prints its arguments on stdout separated by
-// spaces and ending with a newline.
-static void Print(const FunctionCallbackInfo<Value>& args)
-{
-    bool first = true;
-    for (int i = 0; i < args.Length(); i++) {
-        HandleScope handle_scope(args.GetIsolate());
-        if (first) {
-            first = false;
-        } else {
-            printf(" ");
-        }
-        String::Utf8Value str(args.GetIsolate(), args[i]);
-        const char* cstr = ToCString(str);
-        printf("%s", cstr);
-    }
-    printf("\n");
-    fflush(stdout);
-}
-
-static void Version(const FunctionCallbackInfo<Value>& args)
-{
-    args.GetReturnValue().Set(
-            String::NewFromUtf8(args.GetIsolate(), V8::GetVersion(),
-                NewStringType::kNormal).ToLocalChecked());
-}
-
-static void TimeStamp_ms(const FunctionCallbackInfo<Value>& args)
-{
-    double now = now_us() / 1000.0;
-    args.GetReturnValue().Set(Local<Object>::Cast(Number::New(args.GetIsolate(), now)));
-}
 
 V8Context::V8Context(const char* program_)
 {
@@ -72,25 +33,8 @@ V8Context::V8Context(const char* program_)
     // Create a template for the global object.
     Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
 
-    // Bind the global 'print' function to the C++ Print callback.
-    Local<FunctionTemplate> ft = FunctionTemplate::New(isolate, Print);
-    Local<Name> v8_key = String::NewFromUtf8(isolate, "func_property", NewStringType::kNormal).ToLocalChecked();
-    Local<Value> val = Integer::New(isolate, 11);
-    ft->Set(v8_key, val);
-    // ft->Set("func_property", val);
-    object_template->Set(
-            String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(),
-            ft);
-
-    // Bind the 'version' function
-    object_template->Set(
-            String::NewFromUtf8(isolate, "version", NewStringType::kNormal).ToLocalChecked(),
-            FunctionTemplate::New(isolate, Version));
-
-    // Bind the 'timestamp_ms' function
-    object_template->Set(
-            String::NewFromUtf8(isolate, "timestamp_ms", NewStringType::kNormal).ToLocalChecked(),
-            FunctionTemplate::New(isolate, TimeStamp_ms));
+    // Register some callbacks to native functions
+    pl_register_native_functions(this, object_template);
 
     // Create a new context.
     Local<Context> context = Context::New(isolate, 0, object_template);
