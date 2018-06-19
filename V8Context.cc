@@ -1,6 +1,7 @@
 #include "libplatform/libplatform.h"
 #include "pl_util.h"
 #include "pl_native.h"
+#include "pl_inlined.h"
 #include "V8Context.h"
 
 int V8Context::instance_count = 0;
@@ -35,6 +36,9 @@ V8Context::V8Context(const char* program_)
 
     // Register some callbacks to native functions
     pl_register_native_functions(this, object_template);
+
+    // Register inlined JS code
+    // pl_register_inlined_functions(this);
 
     // Create a new context.
     Local<Context> context = Context::New(isolate, 0, object_template);
