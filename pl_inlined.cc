@@ -1,11 +1,17 @@
 #include "pl_inlined.h"
 
+typedef int (*BeforeCB)(V8Context* ctx);
+
+static int create_EventLoop_object(V8Context* ctx);
+
 static struct {
     const char* file_name;
+    BeforeCB    before_cb;
     const char* source;
 } js_inlined[] = {
     {
         "c_eventloop.js", /* on my mac, this eval takes 574.697134 us avg */
+        create_EventLoop_object,
 
         "/*\n"
         " *  C eventloop example (c_eventloop.c).\n"
@@ -110,6 +116,25 @@ void pl_register_inlined_functions(V8Context* ctx)
     size_t j = 0;
     dTHX;
     for (j = 0; j < sizeof(js_inlined) / sizeof(js_inlined[0]); ++j) {
+        if (js_inlined[j].before_cb) {
+            js_inlined[j].before_cb(ctx);
+        }
         pl_eval(aTHX_ ctx, js_inlined[j].source, js_inlined[j].file_name);
     }
+}
+
+static int create_EventLoop_object(V8Context* ctx)
+{
+#if 1
+    return 0;
+#else
+    /*
+     * The idea was to create an EventLoop object that could later hold the
+     * slots for createTimer and deleteTimer, so that it could be used from the
+     * JS code in pl_inline.cc, but I could not make it work.
+     */
+    HV* empty = newHV();
+    SV* ref = newRV_noinc((SV*) empty);
+    return pl_set_global_or_property(aTHX_ ctx, "EventLoop", ref);
+#endif
 }
