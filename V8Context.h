@@ -19,6 +19,8 @@ class V8Context {
         void set(const char* name, SV* value);
         SV* eval(const char* code, const char* file = 0);
 
+        SV* dispatch_function_in_event_loop(const char* func);
+
         int run_gc();
 
         Isolate* isolate;

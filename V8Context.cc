@@ -1,6 +1,7 @@
 #include "libplatform/libplatform.h"
 #include "pl_util.h"
 #include "pl_native.h"
+#include "pl_eventloop.h"
 #include "pl_inlined.h"
 #include "V8Context.h"
 
@@ -36,6 +37,7 @@ V8Context::V8Context(const char* program_)
 
     // Register some callbacks to native functions
     pl_register_native_functions(this, object_template);
+    pl_register_eventloop_functions(this, object_template);
 
     // Register inlined JS code
     // pl_register_inlined_functions(this);
@@ -85,6 +87,16 @@ void V8Context::set(const char* name, SV* value)
 SV* V8Context::eval(const char* code, const char* file)
 {
     return pl_eval(aTHX_ this, code, file);
+}
+
+SV* V8Context::dispatch_function_in_event_loop(const char* func)
+{
+    static int inited;
+    if (!inited) {
+        inited = 1;
+        pl_register_inlined_functions(this);
+    }
+    return pl_run_function_in_event_loop(aTHX_ this, func);
 }
 
 int V8Context::run_gc()
