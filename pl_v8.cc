@@ -9,7 +9,7 @@ using namespace v8;
 
 struct FuncData {
     FuncData(V8Context* ctx, SV* func) :
-        ctx(ctx), func(func) {}
+        ctx(ctx), func(newSVsv(func)) {}
 
     V8Context* ctx;
     SV* func;
@@ -21,14 +21,20 @@ static const char* get_typeof(V8Context* ctx, const Handle<Object>& object);
 
 static void perl_caller(const FunctionCallbackInfo<Value>& args)
 {
-    Local<Function> v8_func = Local<Function>::Cast(args.This());
-    // fprintf(stderr, "YES MOTHERFUCKER!\n");
     Isolate* isolate = args.GetIsolate();
-    Local<Name> v8_key = String::NewFromUtf8(isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
+    Local<Function> v8_func = Local<Function>::Cast(args.This());
+#if 1
     Local<External> v8_val = Local<External>::Cast(args.Data());
+#else
+    // If args.This() returned the same bject as GetFunction() on the function
+    // template we used to create the function, this would work; alas, it
+    // doesn't work, so we have to pass the data we want so that args.Data()
+    // can return it.
+    Local<Name> v8_key = String::NewFromUtf8(isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
+    Local<External> v8_val = Local<External>::Cast(v8_func->Get(v8_key));
+#endif
     FuncData* data = (FuncData*) v8_val->Value();
-    // fprintf(stderr, "PTR => %p\n", data);
-    // HandleScope handle_scope(data->ctx->isolate);
+    // fprintf(stderr, "GOT PTR => %p\n", data);
 
     SV* ret = 0;
 
@@ -102,7 +108,7 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
         Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
         Local<External> v8_val = Local<External>::Cast(object->Get(v8_key));
         FuncData* data = (FuncData*) v8_val->Value();
-        // fprintf(stderr, "PTR => %p\n", data);
+        // fprintf(stderr, "FND PTR => %p\n", data);
         ret = data->func;
 #if 0
         /* if the JS function has a slot with the Perl callback, */
@@ -319,36 +325,14 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
         } else if (SvTYPE(ref) == SVt_PVCV) {
 #if 1
             // fprintf(stderr, "PL SUB\n");
-            SV* func = newSVsv(value);
-            FuncData* data = new FuncData(ctx, func);
+            FuncData* data = new FuncData(ctx, value);
             Local<Value> val = External::New(ctx->isolate, data);
-            // fprintf(stderr, "CREATED callback value => %p\n", data);
-
-            // Local<ObjectTemplate> object_template = Local<ObjectTemplate>::New(ctx->isolate, ctx->persistent_template);
+            // fprintf(stderr, "SET PTR => %p\n", data);
             Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, perl_caller, val);
-            // fprintf(stderr, "CREATED function template\n");
             Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
-            // fprintf(stderr, "CREATED callback key\n");
             Local<Function> v8_func = ft->GetFunction();
-            // fprintf(stderr, "GOT function\n");
             v8_func->Set(v8_key, val);
-            // fprintf(stderr, "SET callback slot\n");
             ret = Local<Object>::Cast(v8_func);
-            // fprintf(stderr, "DONE?!?\n");
-            // object_template->Set( String::NewFromUtf8(isolate, "print", NewStringType::kNormal).ToLocalChecked(), ft);
-#else
-            croak("Don't know yet how to deal with a Perl sub\n");
-            /* use perl_caller as generic handler, but store the real callback */
-            /* in a slot, from where we can later retrieve it */
-            SV* func = newSVsv(value);
-            duk_push_c_function(ctx, perl_caller, DUK_VARARGS);
-            if (!func) {
-                croak("Could not create copy of Perl callback\n");
-            }
-            duk_push_pointer(ctx, func);
-            if (! duk_put_prop_lstring(ctx, -2, PL_SLOT_GENERIC_CALLBACK, sizeof(PL_SLOT_GENERIC_CALLBACK) - 1)) {
-                croak("Could not associate C dispatcher and Perl callback\n");
-            }
 #endif
         } else {
             croak("Don't know how to deal with an undetermined Perl reference\n");
