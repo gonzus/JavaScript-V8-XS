@@ -9,4 +9,6 @@
 %typemap{void}{simple};
 %typemap{bool}{simple};
 %typemap{SV*}{simple};
+%typemap{HV*}{simple};
+%typemap{AV*}{simple};
 
