@@ -106,8 +106,14 @@ V8Context::~V8Context()
     isolate->Dispose();
     delete create_params.array_buffer_allocator;
     delete[] program;
-    // V8Context::terminate_v8(this);
-    // fprintf(stderr, "V8 destroying done\n");
+
+#if 0
+    // We should terminate v8 at some point.  However, because the calling code
+    // may create multiple instances of V8Context, whether "nested" or
+    // "sequential", we cannot just assume we should do this.  For now, we just
+    // *never* terminate v8.
+    V8Context::terminate_v8(this);
+#endif
 }
 
 SV* V8Context::get(const char* name)
