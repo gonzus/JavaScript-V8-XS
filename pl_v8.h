@@ -7,17 +7,8 @@
 class V8Context;
 
 #if 0
-#define V8_OPT_NAME_GATHER_STATS      "gather_stats"
-#define V8_OPT_NAME_SAVE_MESSAGES     "save_messages"
-#define V8_OPT_NAME_MAX_MEMORY_BYTES  "max_memory_bytes"
-#define V8_OPT_NAME_MAX_TIMEOUT_US    "max_timeout_us"
-
-#define V8_OPT_FLAG_GATHER_STATS      0x01
-#define V8_OPT_FLAG_SAVE_MESSAGES     0x02
-#define V8_OPT_FLAG_MAX_MEMORY_BYTES  0x04
-#define V8_OPT_FLAG_MAX_TIMEOUT_US    0x08
-
 #define PL_NAME_ROOT              "_perl_"
+
 #define PL_NAME_GENERIC_CALLBACK  "generic_callback"
 
 #define PL_SLOT_CREATE(name)      (PL_NAME_ROOT "." #name)

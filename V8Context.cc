@@ -3,21 +3,17 @@
 #include "pl_native.h"
 #include "pl_eventloop.h"
 #include "pl_inlined.h"
+#include "pl_stats.h"
 #include "V8Context.h"
 
 int V8Context::instance_count = 0;
 std::unique_ptr<Platform> V8Context::platform = 0;
 
-V8Context::V8Context(const char* program_)
+V8Context::V8Context(HV* opt)
 {
     // fprintf(stderr, "V8 constructing\n");
     program = new char[256];
-    if (program_) {
-        strcpy(program, program_);
-    }
-    else {
-        sprintf(program, "program_%05d", instance_count);
-    }
+    sprintf(program, "program_%05d", instance_count);
 
     V8Context::initialize_v8(this);
 
@@ -34,6 +30,53 @@ V8Context::V8Context(const char* program_)
 
     // Create a template for the global object.
     Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
+
+    pagesize_bytes = total_memory_pages();
+    stats = newHV();
+    msgs = newHV();
+    flags = 0;
+
+    if (opt) {
+        hv_iterinit(opt);
+        while (1) {
+            SV* value = 0;
+            I32 klen = 0;
+            char* kstr = 0;
+            HE* entry = hv_iternext(opt);
+            if (!entry) {
+                break; /* no more hash keys */
+            }
+            kstr = hv_iterkey(entry, &klen);
+            if (!kstr || klen < 0) {
+                continue; /* invalid key */
+            }
+            value = hv_iterval(opt, entry);
+            if (!value) {
+                continue; /* invalid value */
+            }
+            if (memcmp(kstr, V8_OPT_NAME_GATHER_STATS, klen) == 0) {
+                flags |= SvTRUE(value) ? V8_OPT_FLAG_GATHER_STATS : 0;
+                continue;
+            }
+            if (memcmp(kstr, V8_OPT_NAME_SAVE_MESSAGES, klen) == 0) {
+                flags |= SvTRUE(value) ? V8_OPT_FLAG_SAVE_MESSAGES : 0;
+                continue;
+            }
+#if 0
+            if (memcmp(kstr, V8_OPT_NAME_MAX_MEMORY_BYTES, klen) == 0) {
+                int param = SvIV(value);
+                max_allocated_bytes = param > MAX_MEMORY_MINIMUM ? param : MAX_MEMORY_MINIMUM;
+                continue;
+            }
+            if (memcmp(kstr, V8_OPT_NAME_MAX_TIMEOUT_US, klen) == 0) {
+                int param = SvIV(value);
+                max_timeout_us = param > MAX_TIMEOUT_MINIMUM ? param : MAX_TIMEOUT_MINIMUM;
+                continue;
+            }
+#endif
+            croak("Unknown option %*.*s\n", (int) klen, (int) klen, kstr);
+        }
+    }
 
     // Register some callbacks to native functions
     pl_register_native_functions(this, object_template);
@@ -102,6 +145,26 @@ SV* V8Context::dispatch_function_in_event_loop(const char* func)
 int V8Context::run_gc()
 {
     return pl_run_gc(this);
+}
+
+HV* V8Context::get_stats()
+{
+    return stats;
+}
+
+void V8Context::reset_stats()
+{
+    stats = newHV();
+}
+
+HV* V8Context::get_msgs()
+{
+    return msgs;
+}
+
+void V8Context::reset_msgs()
+{
+    msgs = newHV();
 }
 
 void V8Context::initialize_v8(V8Context* self)

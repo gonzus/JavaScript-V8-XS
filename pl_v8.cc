@@ -1,6 +1,7 @@
 // #include "pl_stats.h"
 // #include "pl_util.h"
 #include "V8Context.h"
+#include "pl_stats.h"
 #include "pl_v8.h"
 
 #define PL_GC_RUNS 2
@@ -482,13 +483,19 @@ SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
         String::NewFromUtf8(ctx->isolate, code, NewStringType::kNormal)
         .ToLocalChecked();
 
+    Perf perf;
+
+    pl_stats_start(aTHX_ ctx, &perf);
     // Compile the source code.
     Local<Script> script =
         Script::Compile(context, source).ToLocalChecked();
+    pl_stats_stop(aTHX_ ctx, &perf, "compile");
 
     // Run the script to get the result.
+    pl_stats_start(aTHX_ ctx, &perf);
     Local<Value> result = script->Run(context).ToLocalChecked();
     Handle<Object> object = Local<Object>::Cast(result);
+    pl_stats_stop(aTHX_ ctx, &perf, "run");
 
     // Convert the result into Perl data
     SV* ret = pl_v8_to_perl(aTHX_ ctx, object);
