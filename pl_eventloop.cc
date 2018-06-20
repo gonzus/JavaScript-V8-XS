@@ -235,10 +235,12 @@ static void create_timer(const FunctionCallbackInfo<Value>& args)
 {
     if (timer_count >= MAX_TIMERS) {
         // TODO: error out of here
+        fprintf(stderr, "Too many timers, max is %ld\n", (long) MAX_TIMERS);
         abort();
     }
     if (args.Length() != 3) {
         // TODO: error out of here
+        fprintf(stderr, "create_timer() needs 3 args, got %d\n", args.Length());
         abort();
     }
 
@@ -283,6 +285,7 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
 {
     if (args.Length() != 1) {
         // TODO: error out of here
+        fprintf(stderr, "delete_timer() needs 1 arg, got %d\n", args.Length());
         abort();
     }
 
