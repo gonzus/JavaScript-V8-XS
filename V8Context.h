@@ -50,6 +50,7 @@ class V8Context {
 
         static uint64_t GetTypeFlags(const Local<Value>& v);
     private:
+        int inited;
         void register_functions();
 
         static void initialize_v8(V8Context* self);

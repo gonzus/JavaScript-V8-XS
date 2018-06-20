@@ -11,6 +11,7 @@ int V8Context::instance_count = 0;
 std::unique_ptr<Platform> V8Context::platform = 0;
 
 V8Context::V8Context(HV* opt)
+    : inited(0)
 {
     program = new char[256];
     sprintf(program, "program_%05d", instance_count);
@@ -179,7 +180,6 @@ int V8Context::run_gc()
 void V8Context::register_functions()
 {
     // TODO: this is here because it cannot be done at construction time
-    static int inited;
     if (inited) {
         return;
     }
