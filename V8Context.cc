@@ -137,6 +137,17 @@ SV* V8Context::typeof(const char* name)
     return ret;
 }
 
+SV* V8Context::instanceof(const char* oname, const char* cname)
+{
+    register_functions();
+
+    Perf perf;
+    pl_stats_start(aTHX_ this, &perf);
+    SV* ret = pl_instanceof_global_or_property(aTHX_ this, oname, cname);
+    pl_stats_stop(aTHX_ this, &perf, "instanceof");
+    return ret;
+}
+
 void V8Context::set(const char* name, SV* value)
 {
     register_functions();

@@ -425,22 +425,40 @@ SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
     return ret;
 }
 
-#if 0
-SV* pl_instanceof_global_or_property(pTHX_ duk_context* ctx, const char* object, const char* class)
+SV* pl_instanceof_global_or_property(pTHX_ V8Context* ctx, const char* oname, const char* cname)
 {
+#if 1
+    // TODO: hack alert
+    // This is here only because the real implementation below doesn't work
+    char code[1024];
+    sprintf(code, "%s instanceof %s", oname, cname);
+    return pl_eval(aTHX_ ctx, code);
+#else
     SV* ret = &PL_sv_no; /* return false by default */
-    if (find_global_or_property(ctx, object)) {
-        if (find_global_or_property(ctx, class)) {
-            if (duk_instanceof(ctx, -2, -1)) {
-                ret = &PL_sv_yes;
-            }
-            duk_pop(ctx);
+
+    Isolate::Scope isolate_scope(ctx->isolate);
+    HandleScope handle_scope(ctx->isolate);
+
+    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Context::Scope context_scope(context);
+
+    Local<Object> object;
+    bool found = find_object(ctx, oname, context, object);
+    if (found) {
+        Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate);
+        Local<String> v8_name = String::NewFromUtf8(ctx->isolate, cname, NewStringType::kNormal).ToLocalChecked();
+        ft->SetClassName(v8_name);
+        if (ft->HasInstance(object)) {
+            ret = &PL_sv_yes;
         }
-        duk_pop(ctx);
+        else {
+            fprintf(stderr, "GONZO [%s]\n", cname);
+        }
     }
+
     return ret;
-}
 #endif
+}
 
 SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
 {

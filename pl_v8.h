@@ -49,6 +49,11 @@ SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name);
 SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name);
 
 /*
+ * Return a true value if an object is of a given class
+ */
+SV* pl_instanceof_global_or_property(pTHX_ V8Context* ctx, const char* oname, const char* cname);
+
+/*
  * Set the JS value of a global / nested property from Perl data.
  */
 int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value);
