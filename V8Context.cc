@@ -109,26 +109,42 @@ V8Context::~V8Context()
 
 SV* V8Context::get(const char* name)
 {
-    return pl_get_global_or_property(aTHX_ this, name);
+    Perf perf;
+    pl_stats_start(aTHX_ this, &perf);
+    SV* ret = pl_get_global_or_property(aTHX_ this, name);
+    pl_stats_stop(aTHX_ this, &perf, "get");
+    return ret;
 }
 
 SV* V8Context::exists(const char* name)
 {
-    return pl_exists_global_or_property(aTHX_ this, name);
+    Perf perf;
+    pl_stats_start(aTHX_ this, &perf);
+    SV* ret = pl_exists_global_or_property(aTHX_ this, name);
+    pl_stats_stop(aTHX_ this, &perf, "exists");
+    return ret;
 }
 
 SV* V8Context::typeof(const char* name)
 {
-    return pl_typeof_global_or_property(aTHX_ this, name);
+    Perf perf;
+    pl_stats_start(aTHX_ this, &perf);
+    SV* ret = pl_typeof_global_or_property(aTHX_ this, name);
+    pl_stats_stop(aTHX_ this, &perf, "typeof");
+    return ret;
 }
 
 void V8Context::set(const char* name, SV* value)
 {
+    Perf perf;
+    pl_stats_start(aTHX_ this, &perf);
     pl_set_global_or_property(aTHX_ this, name, value);
+    pl_stats_stop(aTHX_ this, &perf, "set");
 }
 
 SV* V8Context::eval(const char* code, const char* file)
 {
+    // performance is tracked inside this call
     return pl_eval(aTHX_ this, code, file);
 }
 
@@ -146,12 +162,20 @@ SV* V8Context::dispatch_function_in_event_loop(const char* func)
         pl_register_eventloop_functions(this, object_template);
         pl_register_inlined_functions(this);
     }
-    return pl_run_function_in_event_loop(aTHX_ this, func);
+    Perf perf;
+    pl_stats_start(aTHX_ this, &perf);
+    SV* ret = pl_run_function_in_event_loop(aTHX_ this, func);
+    pl_stats_stop(aTHX_ this, &perf, "dispatch");
+    return ret;
 }
 
 int V8Context::run_gc()
 {
-    return pl_run_gc(this);
+    Perf perf;
+    pl_stats_start(aTHX_ this, &perf);
+    int ret = pl_run_gc(this);
+    pl_stats_stop(aTHX_ this, &perf, "run_gc");
+    return ret;
 }
 
 HV* V8Context::get_stats()
