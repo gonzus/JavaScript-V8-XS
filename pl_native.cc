@@ -57,7 +57,6 @@ int pl_register_native_functions(V8Context* ctx, Local<ObjectTemplate>& object_t
     };
     int n = sizeof(data) / sizeof(data[0]);
     for (int j = 0; j < n; ++j) {
-        // fprintf(stderr, "REGISTER callback for [%s]\n", data[j].name);
         object_template->Set(
                 String::NewFromUtf8(ctx->isolate, data[j].name, NewStringType::kNormal).ToLocalChecked(),
                 FunctionTemplate::New(ctx->isolate, data[j].func));

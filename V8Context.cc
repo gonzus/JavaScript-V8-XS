@@ -11,7 +11,6 @@ std::unique_ptr<Platform> V8Context::platform = 0;
 
 V8Context::V8Context(HV* opt)
 {
-    // fprintf(stderr, "V8 constructing\n");
     program = new char[256];
     sprintf(program, "program_%05d", instance_count);
 
@@ -20,10 +19,7 @@ V8Context::V8Context(HV* opt)
     // Create a new Isolate and make it the current one.
     create_params.array_buffer_allocator =
         ArrayBuffer::Allocator::NewDefaultAllocator();
-    // fprintf(stderr, "V8 created allocator\n");
     isolate = Isolate::New(create_params);
-    // fprintf(stderr, "V8 created isolate\n");
-    // fprintf(stderr, "V8 construct done\n");
 
     Isolate::Scope isolate_scope(isolate);
     HandleScope handle_scope(isolate);
@@ -89,7 +85,6 @@ V8Context::V8Context(HV* opt)
     Local<Context> context = Context::New(isolate, 0, object_template);
     persistent_context.Reset(isolate, context);
     persistent_template.Reset(isolate, object_template);
-    // fprintf(stderr, "V8 constructing done\n");
 }
 
 V8Context::~V8Context()
@@ -208,7 +203,6 @@ void V8Context::initialize_v8(V8Context* self)
     platform = platform::NewDefaultPlatform();
     V8::InitializePlatform(platform.get());
     V8::Initialize();
-    // fprintf(stderr, "V8 initializing done\n");
 }
 
 void V8Context::terminate_v8(V8Context* self)
@@ -218,7 +212,6 @@ void V8Context::terminate_v8(V8Context* self)
     }
     V8::Dispose();
     V8::ShutdownPlatform();
-    // fprintf(stderr, "V8 terminating done\n");
 }
 
 uint64_t V8Context::GetTypeFlags(const Local<Value>& v)

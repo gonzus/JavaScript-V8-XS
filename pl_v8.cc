@@ -30,7 +30,6 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
     Local<External> v8_val = Local<External>::Cast(v8_func->Get(v8_key));
 #endif
     FuncData* data = (FuncData*) v8_val->Value();
-    // fprintf(stderr, "GOT PTR => %p\n", data);
 
     SV* ret = 0;
 
@@ -43,16 +42,11 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
 
     /* pass in the stack each of the params we received */
     int nargs = args.Length();
-    // fprintf(stderr, "ARGS: %d\n", nargs);
     for (int j = 0; j < nargs; j++) {
         Local<Value> arg = Local<Value>::Cast(args[j]);
-        // fprintf(stderr, "GOT ARG %d\n", j);
         Handle<Object> object = Local<Object>::Cast(arg);
-        // fprintf(stderr, "GOT HANDLE %d\n", j);
         SV* val = pl_v8_to_perl(aTHX_ data->ctx, object);
-        // fprintf(stderr, "GOT PERL %d\n", j);
         mXPUSHs(val);
-        // fprintf(stderr, "PUSHED ARG %d\n", j);
     }
 
     /* call actual Perl CV, passing all params */
@@ -76,35 +70,27 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
     if (object->IsUndefined()) {
-        // fprintf(stderr, "V8 UNDEFINED\n");
     }
     else if (object->IsNull()) {
-        // fprintf(stderr, "V8 NULL\n");
     }
     else if (object->IsBoolean()) {
         bool val = object->BooleanValue();
-        // fprintf(stderr, "V8 BOOLEAN %d\n", (int) val);
         ret = newSViv(val);
     }
     else if (object->IsNumber()) {
         double val = object->NumberValue();
-        // fprintf(stderr, "V8 NUMBER %f\n", val);
         ret = newSVnv(val);  /* JS numbers are always doubles */
     }
     else if (object->IsString()) {
-        // fprintf(stderr, "STRING BABY\n");
         String::Utf8Value val(ctx->isolate, object);
-        // fprintf(stderr, "V8 STRING [%s]\n", *val);
         ret = newSVpvn(*val, val.length());
         SvUTF8_on(ret); /* yes, always */
     }
     else if (object->IsFunction()) {
-        // fprintf(stderr, "V8 FUNCTION\n");
         Local<Function> v8_func = Local<Function>::Cast(object);
         Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
         Local<External> v8_val = Local<External>::Cast(object->Get(v8_key));
         FuncData* data = (FuncData*) v8_val->Value();
-        // fprintf(stderr, "FND PTR => %p\n", data);
         ret = data->func;
 #if 0
         /* if the JS function has a slot with the Perl callback, */
@@ -138,7 +124,6 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 
             Handle<Array> array = Handle<Array>::Cast(object);
             int array_top = array->Length();
-            // fprintf(stderr, "V8 ARRAY %d\n", array_top);
             for (int j = 0; j < array_top; ++j) {
                 Handle<Object> elem = Local<Object>::Cast(array->Get(j));
                 // TODO: check we got a valid element
@@ -175,7 +160,6 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 
             Local<Array> property_names = object->GetOwnPropertyNames();
             int hash_top = property_names->Length();
-            // fprintf(stderr, "V8 HASH %d\n", hash_top);
             for (int j = 0; j < hash_top; ++j) {
                 Local<Value> v8_key = property_names->Get(j);
                 // TODO: check we got a valid key
@@ -208,19 +192,15 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
 {
     Handle<Object> ret = Local<Object>::Cast(Null(ctx->isolate));
     if (!SvOK(value)) {
-        // fprintf(stderr, "PL UNDEF\n");
     } else if (SvIOK(value)) {
         int val = SvIV(value);
-        // fprintf(stderr, "PL INT %d\n", val);
         ret = Local<Object>::Cast(Number::New(ctx->isolate, val));
     } else if (SvNOK(value)) {
         double val = SvNV(value);
-        // fprintf(stderr, "PL DOUBLE %f\n", val);
         ret = Local<Object>::Cast(Number::New(ctx->isolate, val));
     } else if (SvPOK(value)) {
         STRLEN vlen = 0;
         const char* vstr = SvPV_const(value, vlen);
-        // fprintf(stderr, "PL STRING [%*.*s]\n", vlen, vlen, vstr);
         ret = Local<Object>::Cast(String::NewFromUtf8(ctx->isolate, vstr, NewStringType::kNormal).ToLocalChecked());
     } else if (SvROK(value)) {
         SV* ref = SvRV(value);
@@ -237,7 +217,6 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
                 // duk_push_heapptr(ctx, ptr);
             } else {
                 int array_top = av_top_index(values) + 1;
-                // fprintf(stderr, "PL ARRAY %d\n", array_top);
                 Handle<Array> array = Array::New(ctx->isolate);
                 ret = Local<Object>::Cast(array);
 #if 0
@@ -270,7 +249,6 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
                 void* ptr = (void*) SvUV(*answer);
                 // duk_push_heapptr(ctx, ptr);
             } else {
-                // fprintf(stderr, "PL HASH\n");
                 Local<Context> context = ctx->isolate->GetCurrentContext();
                 Handle<Object> object = Object::New(ctx->isolate);
                 ret = Local<Object>::Cast(object);
@@ -320,10 +298,8 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
             }
         } else if (SvTYPE(ref) == SVt_PVCV) {
 #if 1
-            // fprintf(stderr, "PL SUB\n");
             FuncData* data = new FuncData(ctx, value);
             Local<Value> val = External::New(ctx->isolate, data);
-            // fprintf(stderr, "SET PTR => %p\n", data);
             Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, perl_caller, val);
             Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
             Local<Function> v8_func = ft->GetFunction();

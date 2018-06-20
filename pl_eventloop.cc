@@ -121,7 +121,7 @@ static void expire_timers(V8Context* ctx) {
          *  need to worry about the timer's offset changing on the timer list.
          */
 #if EVENTLOOP_DEBUG > 0
-        fprintf(stderr, "calling user callback for timer id %d\n", (int) t->id);
+        fprintf(stderr, "> calling user callback for timer id %d\n", (int) t->id);
         fflush(stderr);
 #endif
         Isolate::Scope isolate_scope(ctx->isolate);
@@ -140,14 +140,14 @@ static void expire_timers(V8Context* ctx) {
         }
 
 #if EVENTLOOP_DEBUG > 0
-        fprintf(stderr, "called user callback for timer id %d\n", (int) t->id);
+        fprintf(stderr, "> called user callback for timer id %d\n", (int) t->id);
         fflush(stderr);
 #endif
 
         if (t->removed) {
             /* One-shot timer (always removed) or removed by user callback. */
 #if EVENTLOOP_DEBUG > 0
-            fprintf(stderr, "callback deleted timer %d\n", (int) t->id);
+            fprintf(stderr, "> callback deleted timer %d\n", (int) t->id);
             fflush(stderr);
 #endif
         } else {
@@ -155,12 +155,12 @@ static void expire_timers(V8Context* ctx) {
              * timer list and bubble to its final sorted position.
              */
 #if EVENTLOOP_DEBUG > 0
-            fprintf(stderr, "queueing timer %d back into active list\n", (int) t->id);
+            fprintf(stderr, "> queueing timer %d back into active list\n", (int) t->id);
             fflush(stderr);
 #endif
             if (timer_count >= MAX_TIMERS) {
                 // TODO error out of here
-                fprintf(stderr, "out of timer slots");
+                fprintf(stderr, "out of timer slots, max is %ld\n", (long) MAX_TIMERS);
                 fflush(stderr);
             }
             memcpy((void *) (timer_list + timer_count), (void *) t, sizeof(ev_timer));
@@ -201,7 +201,7 @@ int eventloop_run(V8Context* ctx) {
             timeout = (int) diff;  /* clamping ensures that fits */
         } else {
 #if EVENTLOOP_DEBUG > 0
-            fprintf(stderr, "no timers to poll, exiting\n");
+            fprintf(stderr, "> no timers to poll, exiting\n");
             fflush(stderr);
 #endif
             break;
@@ -211,12 +211,12 @@ int eventloop_run(V8Context* ctx) {
          *  Poll for timeout.
          */
 #if EVENTLOOP_DEBUG > 0
-        fprintf(stderr, "going to poll, timeout %d ms\n", timeout);
+        fprintf(stderr, "> going to poll, timeout %d ms\n", timeout);
         fflush(stderr);
 #endif
         rc = poll(0, 0, timeout);
 #if EVENTLOOP_DEBUG > 0
-        fprintf(stderr, "poll rc: %d\n", rc);
+        fprintf(stderr, "> poll rc: %d\n", rc);
         fflush(stderr);
 #endif
         if (rc < 0) {
@@ -275,7 +275,7 @@ static void create_timer(const FunctionCallbackInfo<Value>& args)
 
     /* Return timer id. */
 #if EVENTLOOP_DEBUG > 0
-    fprintf(stderr, "created timer id: %lld\n", timer_id);
+    fprintf(stderr, "> created timer id: %lld\n", timer_id);
     fflush(stderr);
 #endif
     args.GetReturnValue().Set(Local<Object>::Cast(Number::New(args.GetIsolate(), timer_id)));
@@ -309,7 +309,7 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
     if (t->id == timer_id) {
         t->removed = 1;
 #if EVENTLOOP_DEBUG > 0
-        fprintf(stderr, "deleted expiring timer id: %lld\n", timer_id);
+        fprintf(stderr, "> deleted expiring timer id: %lld\n", timer_id);
         fflush(stderr);
 #endif
         args.GetReturnValue().Set(Local<Object>::Cast(Boolean::New(args.GetIsolate(), true)));
@@ -338,7 +338,7 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
             timer_count--;
 
 #if EVENTLOOP_DEBUG > 0
-            fprintf(stderr, "deleted timer id: %lld\n", timer_id);
+            fprintf(stderr, "> deleted timer id: %lld\n", timer_id);
             fflush(stderr);
 #endif
             found = true;
@@ -348,7 +348,7 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
 
 #if EVENTLOOP_DEBUG > 0
     if (!found) {
-        fprintf(stderr, "trying to delete timer id %lld, but not found; ignoring\n", timer_id);
+        fprintf(stderr, "> trying to delete timer id %lld, but not found; ignoring\n", timer_id);
         fflush(stderr);
     }
 #endif
