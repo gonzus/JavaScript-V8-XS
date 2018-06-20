@@ -1,4 +1,5 @@
 #include "pl_stats.h"
+#include "pl_console.h"
 #include "pl_v8.h"
 
 #define PL_GC_RUNS 2
@@ -443,33 +444,54 @@ SV* pl_instanceof_global_or_property(pTHX_ duk_context* ctx, const char* object,
 
 SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
 {
+    SV* ret = &PL_sv_undef; /* return undef by default */
+
     Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
 
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
-    // Create a string containing the JavaScript source code.
-    Local<String> source =
-        String::NewFromUtf8(ctx->isolate, code, NewStringType::kNormal)
-        .ToLocalChecked();
+    TryCatch try_catch(ctx->isolate);
+    bool ok = true;
+    do {
+        // Create a string containing the JavaScript source code.
+        Local<String> source;
+        ok = String::NewFromUtf8(ctx->isolate, code, NewStringType::kNormal).ToLocal(&source);
+        if (!ok) {
+            break;
+        }
 
-    Perf perf;
+        Perf perf;
 
-    pl_stats_start(aTHX_ ctx, &perf);
-    // Compile the source code.
-    Local<Script> script =
-        Script::Compile(context, source).ToLocalChecked();
-    pl_stats_stop(aTHX_ ctx, &perf, "compile");
+        // Compile the source code.
+        pl_stats_start(aTHX_ ctx, &perf);
+        Local<Script> script;
+        ok = Script::Compile(context, source).ToLocal(&script);
+        pl_stats_stop(aTHX_ ctx, &perf, "compile");
+        if (!ok) {
+            break;
+        }
 
-    // Run the script to get the result.
-    pl_stats_start(aTHX_ ctx, &perf);
-    Local<Value> result = script->Run(context).ToLocalChecked();
-    Handle<Object> object = Local<Object>::Cast(result);
-    pl_stats_stop(aTHX_ ctx, &perf, "run");
+        // Run the script to get the result.
+        pl_stats_start(aTHX_ ctx, &perf);
+        Local<Value> result;
+        ok = script->Run(context).ToLocal(&result);
+        pl_stats_stop(aTHX_ ctx, &perf, "run");
+        if (!ok) {
+            break;
+        }
 
-    // Convert the result into Perl data
-    SV* ret = pl_v8_to_perl(aTHX_ ctx, object);
+        // Convert the result into Perl data
+        Handle<Object> object = Local<Object>::Cast(result);
+        ret = pl_v8_to_perl(aTHX_ ctx, object);
+    } while (0);
+    if (!ok) {
+        String::Utf8Value error(ctx->isolate, try_catch.Exception());
+        pl_show_error(ctx, *error);
+        return ret;
+    }
+
     return ret;
 }
 

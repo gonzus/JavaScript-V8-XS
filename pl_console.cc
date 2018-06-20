@@ -41,6 +41,26 @@ static void save_msg(pTHX_ V8Context* ctx, const char* target, SV* message)
     }
 }
 
+static int console_output_string(V8Context* ctx, SV* message, unsigned int flags)
+{
+    dTHX;
+
+    STRLEN mlen = 0;
+    char* mstr = SvPV(message, mlen);
+    if (ctx->flags & V8_OPT_FLAG_SAVE_MESSAGES) {
+        const char* target = (flags & CONSOLE_TARGET_STDERR) ? "stderr" : "stdout";
+        save_msg(aTHX_ ctx, target, message);
+    }
+    else {
+        PerlIO* fp = (flags & CONSOLE_TARGET_STDERR) ? PerlIO_stderr() : PerlIO_stdout();
+        PerlIO_printf(fp, "%s\n", mstr);
+        if (flags & CONSOLE_FLUSH) {
+            PerlIO_flush(fp);
+        }
+    }
+    return mlen;
+}
+
 static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int flags)
 {
     dTHX;
@@ -69,22 +89,8 @@ static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int 
         String::Utf8Value str(isolate, json);
         Perl_sv_catpvn(aTHX_ message, *str, str.length());
     }
-    STRLEN mlen = 0;
-    char* mstr = SvPV(message, mlen);
 
-    if (ctx->flags & V8_OPT_FLAG_SAVE_MESSAGES) {
-        const char* target = (flags & CONSOLE_TARGET_STDERR) ? "stderr" : "stdout";
-        save_msg(aTHX_ ctx, target, message);
-    }
-    else {
-        PerlIO* fp = (flags & CONSOLE_TARGET_STDERR) ? PerlIO_stderr() : PerlIO_stdout();
-        PerlIO_printf(fp, "%s\n", mstr);
-        if (flags & CONSOLE_FLUSH) {
-            PerlIO_flush(fp);
-        }
-    }
-
-    return mlen;
+    return console_output_string(ctx, message, flags);
 }
 
 static void console_assert(const FunctionCallbackInfo<Value>& args)
@@ -168,4 +174,11 @@ int pl_register_console_functions(V8Context* ctx)
         object->Set(slot, v8_func);
     }
     return n;
+}
+
+int pl_show_error(V8Context* ctx, const char* mstr)
+{
+    STRLEN mlen = 0;
+    SV* message = newSVpv(mstr, mlen);
+    return console_output_string(ctx, message, CONSOLE_TARGET_STDERR | CONSOLE_FLUSH);
 }
