@@ -75,26 +75,26 @@ static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int 
     SV* message = newSVpvs("");
     bool separate = false;
     if (preamble) {
-        sv_catpv(aTHX_ message, preamble);
-        sv_catpvn(aTHX_ message, ":", 1);
+        Perl_sv_catpv(aTHX_ message, preamble);
+        Perl_sv_catpvn(aTHX_ message, ":", 1);
         separate = true;
     }
     for (int j = start; j < args.Length(); j++) {
         // add separator if necessary
         if (separate) {
-            sv_catpvn(aTHX_ message, " ", 1);
+            Perl_sv_catpvn(aTHX_ message, " ", 1);
         }
         separate = true;
         // for non-objects, just get their value as string
         if (!args[j]->IsObject()) {
             String::Utf8Value str(isolate, args[j]);
-            sv_catpvn(aTHX_ message, *str, str.length());
+            Perl_sv_catpvn(aTHX_ message, *str, str.length());
             continue;
         }
         // convert objects to JSON
         Local<String> json = JSON::Stringify(context, args[j]).ToLocalChecked();
         String::Utf8Value str(isolate, json);
-        sv_catpvn(aTHX_ message, *str, str.length());
+        Perl_sv_catpvn(aTHX_ message, *str, str.length());
     }
     if (stack) {
 #if 0
