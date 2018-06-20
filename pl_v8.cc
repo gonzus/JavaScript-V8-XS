@@ -1,6 +1,3 @@
-// #include "pl_stats.h"
-// #include "pl_util.h"
-#include "V8Context.h"
 #include "pl_stats.h"
 #include "pl_v8.h"
 
@@ -16,8 +13,6 @@ struct FuncData {
     SV* func;
 };
 
-static bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object, Local<Value>& slot);
-static bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object);
 static const char* get_typeof(V8Context* ctx, const Handle<Object>& object);
 
 static void perl_caller(const FunctionCallbackInfo<Value>& args)
@@ -511,7 +506,7 @@ int pl_run_gc(V8Context* ctx)
     return PL_GC_RUNS;
 }
 
-static bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object, Local<Value>& slot)
+bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object, Local<Value>& slot, int create)
 {
     int start = 0;
     object = context->Global();
@@ -532,11 +527,20 @@ static bool find_parent(V8Context* ctx, const char* name, Local<Context>& contex
             found = true;
             break;
         }
-        if (!object->Has(slot)) {
-            // object doesn't have a slot with that name
+        Local<Value> child;
+        if (object->Has(slot)) {
+            // object has a slot with that name
+            child = object->Get(slot);
+        }
+        else if (!create) {
+            // we must not create the missing slot, we are done
             break;
         }
-        Local<Value> child = object->Get(slot);
+        else {
+            // create the missing slot and go on
+            child = Object::New(ctx->isolate);
+            object->Set(slot, child);
+        }
         object = Local<Object>::Cast(child);
         if (!child->IsObject()) {
             // child in slot is not an object
@@ -548,7 +552,7 @@ static bool find_parent(V8Context* ctx, const char* name, Local<Context>& contex
     return found;
 }
 
-static bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object)
+bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object)
 {
     Local<Value> slot;
     if (!find_parent(ctx, name, context, object, slot)) {

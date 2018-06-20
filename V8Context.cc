@@ -80,7 +80,7 @@ V8Context::V8Context(HV* opt)
 
     // Register some callbacks to native functions
     pl_register_native_functions(this, object_template);
-    pl_register_eventloop_functions(this, object_template);
+    // pl_register_eventloop_functions(this, object_template);
 
     // Register inlined JS code
     // pl_register_inlined_functions(this);
@@ -134,9 +134,16 @@ SV* V8Context::eval(const char* code, const char* file)
 
 SV* V8Context::dispatch_function_in_event_loop(const char* func)
 {
+    // TODO: this is here because it cannot be done at construction time
     static int inited;
     if (!inited) {
         inited = 1;
+        Isolate::Scope isolate_scope(isolate);
+        HandleScope handle_scope(isolate);
+
+        // Create a template for the global object.
+        Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
+        pl_register_eventloop_functions(this, object_template);
         pl_register_inlined_functions(this);
     }
     return pl_run_function_in_event_loop(aTHX_ this, func);

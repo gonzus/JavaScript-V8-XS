@@ -4,6 +4,7 @@
 #include <v8.h>
 #include "pl_config.h"
 
+using namespace v8;
 class V8Context;
 
 #if 0
@@ -71,5 +72,8 @@ int pl_call_perl_sv(duk_context* ctx, SV* func);
 /* Get / set the value for a global object or a slot in an object */
 SV* pl_instanceof_global_or_property(pTHX_ duk_context* ctx, const char* object, const char* class);
 #endif
+
+bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object, Local<Value>& slot, int create = 0);
+bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object);
 
 #endif

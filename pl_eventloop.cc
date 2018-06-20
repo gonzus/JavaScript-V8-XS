@@ -362,15 +362,25 @@ int pl_register_eventloop_functions(V8Context* ctx, Local<ObjectTemplate>& objec
         const char* name;
         Handler func;
     } data[] = {
-        // TODO: these should be functions inside an object EventLoop
-        { "EventLoop_createTimer", create_timer },
-        { "EventLoop_deleteTimer", delete_timer },
+        { "EventLoop.createTimer", create_timer },
+        { "EventLoop.deleteTimer", delete_timer },
     };
+    Isolate::Scope isolate_scope(ctx->isolate);
+    HandleScope handle_scope(ctx->isolate);
+    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Context::Scope context_scope(context);
     int n = sizeof(data) / sizeof(data[0]);
     for (int j = 0; j < n; ++j) {
-        object_template->Set(
-                String::NewFromUtf8(ctx->isolate, data[j].name, NewStringType::kNormal).ToLocalChecked(),
-                FunctionTemplate::New(ctx->isolate, data[j].func));
+        Local<Object> object;
+        Local<Value> slot;
+        bool found = find_parent(ctx, data[j].name, context, object, slot, true);
+        if (!found) {
+            fprintf(stderr, "could not create parent for %s\n", data[j].name);
+            continue;
+        }
+        Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, data[j].func);
+        Local<Function> v8_func = ft->GetFunction();
+        object->Set(slot, v8_func);
     }
     return n;
 }
