@@ -61,7 +61,7 @@ static int console_output_string(V8Context* ctx, SV* message, unsigned int flags
     return mlen;
 }
 
-static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int flags, const char* preamble = 0, int start = 0)
+static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int flags, const char* preamble = 0, bool stack = false, int start = 0)
 {
     dTHX;
 
@@ -96,6 +96,13 @@ static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int 
         String::Utf8Value str(isolate, json);
         sv_catpvn(aTHX_ message, *str, str.length());
     }
+    if (stack) {
+#if 0
+        // TODO: generate a stack trace
+        v8_inspector::V8Inspector* inspector = new v8_inspector::V8InspectorImpl::V8InspectorImpl();
+        inspector->captureStackTrace();
+#endif
+    }
 
     return console_output_string(ctx, message, flags);
 }
@@ -109,7 +116,7 @@ static void console_assert(const FunctionCallbackInfo<Value>& args)
     if (silent) {
         return;
     }
-    console_output(args, CONSOLE_TARGET_STDOUT | CONSOLE_FLUSH, "AssertionError", 1);
+    console_output(args, CONSOLE_TARGET_STDOUT | CONSOLE_FLUSH, "AssertionError", true, 1);
 }
 
 static void console_log(const FunctionCallbackInfo<Value>& args)
@@ -124,7 +131,7 @@ static void console_debug(const FunctionCallbackInfo<Value>& args)
 
 static void console_trace(const FunctionCallbackInfo<Value>& args)
 {
-    console_output(args, CONSOLE_TARGET_STDOUT | CONSOLE_FLUSH, "Trace");
+    console_output(args, CONSOLE_TARGET_STDOUT | CONSOLE_FLUSH, "Trace", true);
 }
 
 static void console_info(const FunctionCallbackInfo<Value>& args)
@@ -139,12 +146,12 @@ static void console_warn(const FunctionCallbackInfo<Value>& args)
 
 static void console_error(const FunctionCallbackInfo<Value>& args)
 {
-    console_output(args, CONSOLE_TARGET_STDERR | CONSOLE_FLUSH, "Error");
+    console_output(args, CONSOLE_TARGET_STDERR | CONSOLE_FLUSH, "Error", true);
 }
 
 static void console_exception(const FunctionCallbackInfo<Value>& args)
 {
-    console_output(args, CONSOLE_TARGET_STDERR | CONSOLE_FLUSH);
+    console_output(args, CONSOLE_TARGET_STDERR | CONSOLE_FLUSH, "Error", true);
 }
 
 static void console_dir(const FunctionCallbackInfo<Value>& args)
