@@ -135,7 +135,7 @@ static void console_exception(const FunctionCallbackInfo<Value>& args)
 
 static void console_dir(const FunctionCallbackInfo<Value>& args)
 {
-    console_output(args, CONSOLE_TARGET_STDOUT | CONSOLE_FLUSH);
+    console_output(args, CONSOLE_TARGET_STDERR | CONSOLE_FLUSH);
 }
 
 int pl_register_console_functions(V8Context* ctx)
