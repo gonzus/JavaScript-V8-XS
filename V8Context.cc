@@ -1,6 +1,7 @@
 #include "libplatform/libplatform.h"
 #include "pl_util.h"
 #include "pl_native.h"
+#include "pl_console.h"
 #include "pl_eventloop.h"
 #include "pl_inlined.h"
 #include "pl_stats.h"
@@ -76,7 +77,7 @@ V8Context::V8Context(HV* opt)
 
     // Register some callbacks to native functions
     pl_register_native_functions(this, object_template);
-    // pl_register_eventloop_functions(this, object_template);
+    // pl_register_eventloop_functions(this);
 
     // Register inlined JS code
     // pl_register_inlined_functions(this);
@@ -104,6 +105,8 @@ V8Context::~V8Context()
 
 SV* V8Context::get(const char* name)
 {
+    register_functions();
+
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
     SV* ret = pl_get_global_or_property(aTHX_ this, name);
@@ -113,6 +116,8 @@ SV* V8Context::get(const char* name)
 
 SV* V8Context::exists(const char* name)
 {
+    register_functions();
+
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
     SV* ret = pl_exists_global_or_property(aTHX_ this, name);
@@ -122,6 +127,8 @@ SV* V8Context::exists(const char* name)
 
 SV* V8Context::typeof(const char* name)
 {
+    register_functions();
+
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
     SV* ret = pl_typeof_global_or_property(aTHX_ this, name);
@@ -131,6 +138,8 @@ SV* V8Context::typeof(const char* name)
 
 void V8Context::set(const char* name, SV* value)
 {
+    register_functions();
+
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
     pl_set_global_or_property(aTHX_ this, name, value);
@@ -139,24 +148,16 @@ void V8Context::set(const char* name, SV* value)
 
 SV* V8Context::eval(const char* code, const char* file)
 {
+    register_functions();
+
     // performance is tracked inside this call
     return pl_eval(aTHX_ this, code, file);
 }
 
 SV* V8Context::dispatch_function_in_event_loop(const char* func)
 {
-    // TODO: this is here because it cannot be done at construction time
-    static int inited;
-    if (!inited) {
-        inited = 1;
-        Isolate::Scope isolate_scope(isolate);
-        HandleScope handle_scope(isolate);
+    register_functions();
 
-        // Create a template for the global object.
-        Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
-        pl_register_eventloop_functions(this, object_template);
-        pl_register_inlined_functions(this);
-    }
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
     SV* ret = pl_run_function_in_event_loop(aTHX_ this, func);
@@ -166,11 +167,26 @@ SV* V8Context::dispatch_function_in_event_loop(const char* func)
 
 int V8Context::run_gc()
 {
+    register_functions();
+
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
     int ret = pl_run_gc(this);
     pl_stats_stop(aTHX_ this, &perf, "run_gc");
     return ret;
+}
+
+void V8Context::register_functions()
+{
+    // TODO: this is here because it cannot be done at construction time
+    static int inited;
+    if (inited) {
+        return;
+    }
+    inited = 1;
+    pl_register_eventloop_functions(this);
+    pl_register_inlined_functions(this);
+    pl_register_console_functions(this);
 }
 
 HV* V8Context::get_stats()

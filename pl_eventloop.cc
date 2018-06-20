@@ -18,8 +18,6 @@
 #define  MAX_EXPIRIES           10
 #define  MAX_TIMERS             4096     /* this is quite excessive for embedded use, but good for testing */
 
-typedef void (*Handler)(const FunctionCallbackInfo<Value>& args);
-
 typedef struct {
     int64_t id;       /* numeric ID (returned from e.g. setTimeout); zero if unused */
     double target;    /* next target time */
@@ -356,8 +354,9 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
     args.GetReturnValue().Set(Local<Object>::Cast(Boolean::New(args.GetIsolate(), found)));
 }
 
-int pl_register_eventloop_functions(V8Context* ctx, Local<ObjectTemplate>& object_template)
+int pl_register_eventloop_functions(V8Context* ctx)
 {
+    typedef void (*Handler)(const FunctionCallbackInfo<Value>& args);
     static struct Data {
         const char* name;
         Handler func;
