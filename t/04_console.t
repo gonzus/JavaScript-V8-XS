@@ -13,7 +13,6 @@ sub test_console {
 
     my @targets = qw/ stdout stderr /;
     my %funcs = (
-        assert    => 0,
         log       => 0,
         debug     => 0,
         trace     => 0,
@@ -43,10 +42,28 @@ sub test_console {
     }
 }
 
+sub test_assert {
+    my $vm = $CLASS->new();
+    ok($vm, "created $CLASS object");
+
+    my %values = (
+        true => '',
+        false => 'AssertionError',
+    );
+    foreach my $value (sort keys %values) {
+        my $expected = $values{$value};
+        my $js = "console.assert($value, '$value')";
+        my ($out, $err) = output_from(sub { $vm->eval($js); });
+        like($out, qr/$expected/, "got expected contents for assert in stdout for $value");
+        is($err, '', "got empty stderr for assert for $value");
+    }
+}
+
 sub main {
     use_ok($CLASS);
 
     test_console();
+    test_assert();
     done_testing;
     return 0;
 }
