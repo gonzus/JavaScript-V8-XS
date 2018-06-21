@@ -528,10 +528,10 @@ int pl_run_gc(V8Context* ctx)
     return PL_GC_RUNS;
 }
 
-bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object, Local<Value>& slot, int create)
+bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& parent, Local<Value>& slot, int create)
 {
     int start = 0;
-    object = context->Global();
+    parent = context->Global();
     bool found = false;
     while (1) {
         int pos = start;
@@ -550,9 +550,9 @@ bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Loca
             break;
         }
         Local<Value> child;
-        if (object->Has(slot)) {
-            // object has a slot with that name
-            child = object->Get(slot);
+        if (parent->Has(slot)) {
+            // parent has a slot with that name
+            child = parent->Get(slot);
         }
         else if (!create) {
             // we must not create the missing slot, we are done
@@ -561,9 +561,9 @@ bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Loca
         else {
             // create the missing slot and go on
             child = Object::New(ctx->isolate);
-            object->Set(slot, child);
+            parent->Set(slot, child);
         }
-        object = Local<Object>::Cast(child);
+        parent = Local<Object>::Cast(child);
         if (!child->IsObject()) {
             // child in slot is not an object
             break;
@@ -576,16 +576,17 @@ bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Loca
 
 bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Local<Object>& object)
 {
+    Local<Object> parent;
     Local<Value> slot;
-    if (!find_parent(ctx, name, context, object, slot)) {
+    if (!find_parent(ctx, name, context, parent, slot)) {
         // could not find parent
         return false;
     }
-    if (!object->Has(slot)) {
+    if (!parent->Has(slot)) {
         // parent doesn't have a slot with that name
         return false;
     }
-    Local<Value> child = object->Get(slot);
+    Local<Value> child = parent->Get(slot);
     object = Local<Object>::Cast(child);
     return true;
 }
