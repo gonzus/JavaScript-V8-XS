@@ -122,7 +122,6 @@ static void expire_timers(V8Context* ctx) {
         fprintf(stderr, "> calling user callback for timer id %d\n", (int) t->id);
         fflush(stderr);
 #endif
-        Isolate::Scope isolate_scope(ctx->isolate);
         HandleScope handle_scope(ctx->isolate);
         Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
         Context::Scope context_scope(context);
@@ -364,7 +363,6 @@ int pl_register_eventloop_functions(V8Context* ctx)
         { "EventLoop.createTimer", create_timer },
         { "EventLoop.deleteTimer", delete_timer },
     };
-    Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);

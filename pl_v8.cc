@@ -19,7 +19,12 @@ static const char* get_typeof(V8Context* ctx, const Handle<Object>& object);
 static void perl_caller(const FunctionCallbackInfo<Value>& args)
 {
     Isolate* isolate = args.GetIsolate();
+#if 1
+    HandleScope handle_scope(isolate);
+#endif
+
     Local<Function> v8_func = Local<Function>::Cast(args.This());
+
 #if 1
     Local<External> v8_val = Local<External>::Cast(args.Data());
 #else
@@ -319,6 +324,10 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
 SV* pl_v8_to_perl(pTHX_ V8Context* ctx, const Handle<Object>& object)
 {
     HV* seen = newHV();
+#if 1
+    HandleScope handle_scope(ctx->isolate);
+#endif
+
     SV* ret = pl_v8_to_perl_impl(aTHX_ ctx, object, seen);
     hv_undef(seen);
     return ret;
@@ -329,6 +338,9 @@ const Handle<Object> pl_perl_to_v8(pTHX_ SV* value, V8Context* ctx)
     HV* seen = newHV();
     Handle<Object> ret = pl_perl_to_v8_impl(aTHX_ value, ctx, seen);
     hv_undef(seen);
+#if 0
+    HandleScope handle_scope(ctx->isolate);
+#endif
     return ret;
 }
 
@@ -348,7 +360,6 @@ SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name)
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
 
-    Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
 
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
@@ -367,7 +378,6 @@ int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value)
 {
     int ret = 0;
 
-    Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
 
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
@@ -389,7 +399,6 @@ SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name)
 {
     SV* ret = &PL_sv_no; /* return false by default */
 
-    Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
 
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
@@ -408,7 +417,6 @@ SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
 {
     const char* cstr = "undefined";
 
-    Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
 
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
@@ -436,7 +444,6 @@ SV* pl_instanceof_global_or_property(pTHX_ V8Context* ctx, const char* oname, co
 #else
     SV* ret = &PL_sv_no; /* return false by default */
 
-    Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
 
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
@@ -464,7 +471,6 @@ SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
 
-    Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
 
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);

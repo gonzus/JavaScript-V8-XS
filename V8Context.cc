@@ -7,6 +7,10 @@
 #include "pl_stats.h"
 #include "V8Context.h"
 
+#define ENTER_SCOPE \
+    Isolate::Scope isolate_scope(isolate); \
+    HandleScope handle_scope(isolate)
+
 int V8Context::instance_count = 0;
 std::unique_ptr<Platform> V8Context::platform = 0;
 
@@ -23,11 +27,7 @@ V8Context::V8Context(HV* opt)
         ArrayBuffer::Allocator::NewDefaultAllocator();
     isolate = Isolate::New(create_params);
 
-    Isolate::Scope isolate_scope(isolate);
-    HandleScope handle_scope(isolate);
-
-    // Create a template for the global object.
-    Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
+    ENTER_SCOPE;
 
     pagesize_bytes = total_memory_pages();
     stats = newHV();
@@ -76,6 +76,9 @@ V8Context::V8Context(HV* opt)
         }
     }
 
+    // Create a template for the global object.
+    Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
+
     // Register some callbacks to native functions
     pl_register_native_functions(this, object_template);
     // pl_register_eventloop_functions(this);
@@ -106,6 +109,7 @@ V8Context::~V8Context()
 
 SV* V8Context::get(const char* name)
 {
+    ENTER_SCOPE;
     register_functions();
 
     Perf perf;
@@ -117,6 +121,7 @@ SV* V8Context::get(const char* name)
 
 SV* V8Context::exists(const char* name)
 {
+    ENTER_SCOPE;
     register_functions();
 
     Perf perf;
@@ -128,6 +133,7 @@ SV* V8Context::exists(const char* name)
 
 SV* V8Context::typeof(const char* name)
 {
+    ENTER_SCOPE;
     register_functions();
 
     Perf perf;
@@ -139,6 +145,7 @@ SV* V8Context::typeof(const char* name)
 
 SV* V8Context::instanceof(const char* oname, const char* cname)
 {
+    ENTER_SCOPE;
     register_functions();
 
     Perf perf;
@@ -150,6 +157,7 @@ SV* V8Context::instanceof(const char* oname, const char* cname)
 
 void V8Context::set(const char* name, SV* value)
 {
+    ENTER_SCOPE;
     register_functions();
 
     Perf perf;
@@ -160,6 +168,7 @@ void V8Context::set(const char* name, SV* value)
 
 SV* V8Context::eval(const char* code, const char* file)
 {
+    ENTER_SCOPE;
     register_functions();
 
     // performance is tracked inside this call
@@ -168,6 +177,7 @@ SV* V8Context::eval(const char* code, const char* file)
 
 SV* V8Context::dispatch_function_in_event_loop(const char* func)
 {
+    ENTER_SCOPE;
     register_functions();
 
     Perf perf;
@@ -179,6 +189,7 @@ SV* V8Context::dispatch_function_in_event_loop(const char* func)
 
 int V8Context::run_gc()
 {
+    ENTER_SCOPE;
     register_functions();
 
     Perf perf;
@@ -186,18 +197,6 @@ int V8Context::run_gc()
     int ret = pl_run_gc(this);
     pl_stats_stop(aTHX_ this, &perf, "run_gc");
     return ret;
-}
-
-void V8Context::register_functions()
-{
-    // TODO: this is here because it cannot be done at construction time
-    if (inited) {
-        return;
-    }
-    inited = 1;
-    pl_register_eventloop_functions(this);
-    pl_register_inlined_functions(this);
-    pl_register_console_functions(this);
 }
 
 HV* V8Context::get_stats()
@@ -218,6 +217,19 @@ HV* V8Context::get_msgs()
 void V8Context::reset_msgs()
 {
     msgs = newHV();
+}
+
+void V8Context::register_functions()
+{
+    // TODO: this is here because it cannot be done at construction time
+    if (inited) {
+        return;
+    }
+    inited = 1;
+    ENTER_SCOPE;
+    pl_register_eventloop_functions(this);
+    pl_register_inlined_functions(this);
+    pl_register_console_functions(this);
 }
 
 void V8Context::initialize_v8(V8Context* self)

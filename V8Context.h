@@ -59,10 +59,6 @@ class V8Context {
         static int instance_count;
         static std::unique_ptr<Platform> platform;
 
-        Handle<Array> CreateArray(int nested);
-        Handle<Object> CreateObject(int nested);
-        void DumpObject(const Handle<Object>& object, int level = 0);
-
         char* program;
         Isolate::CreateParams create_params;
 };

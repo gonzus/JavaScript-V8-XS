@@ -176,7 +176,6 @@ int pl_register_console_functions(V8Context* ctx)
         { "console.exception", console_exception },
         { "console.dir"      , console_dir       },
     };
-    Isolate::Scope isolate_scope(ctx->isolate);
     HandleScope handle_scope(ctx->isolate);
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
