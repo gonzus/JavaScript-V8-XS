@@ -14,7 +14,7 @@ struct FuncData {
     SV* func;
 };
 
-static const char* get_typeof(V8Context* ctx, const Handle<Object>& object);
+static const char* get_typeof(V8Context* ctx, const Local<Object>& object);
 
 static void perl_caller(const FunctionCallbackInfo<Value>& args)
 {
@@ -50,7 +50,7 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
     int nargs = args.Length();
     for (int j = 0; j < nargs; j++) {
         Local<Value> arg = Local<Value>::Cast(args[j]);
-        Handle<Object> object = Local<Object>::Cast(arg);
+        Local<Object> object = Local<Object>::Cast(arg);
         SV* val = pl_v8_to_perl(aTHX_ data->ctx, object);
         mXPUSHs(val);
     }
@@ -62,7 +62,7 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
 
     /* get returned value from Perl and return it */
     ret = POPs;
-    Handle<Object> object = pl_perl_to_v8(aTHX_ ret, data->ctx);
+    Local<Object> object = pl_perl_to_v8(aTHX_ ret, data->ctx);
 
     args.GetReturnValue().Set(object);
 
@@ -72,7 +72,7 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
     LEAVE;
 }
 
-static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object, HV* seen)
+static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object, HV* seen)
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
     if (object->IsUndefined()) {
@@ -128,10 +128,10 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
 #endif
             ret = newRV(values);
 
-            Handle<Array> array = Handle<Array>::Cast(object);
+            Local<Array> array = Local<Array>::Cast(object);
             int array_top = array->Length();
             for (int j = 0; j < array_top; ++j) {
-                Handle<Object> elem = Local<Object>::Cast(array->Get(j));
+                Local<Object> elem = Local<Object>::Cast(array->Get(j));
                 // TODO: check we got a valid element
                 SV* nested = sv_2mortal(pl_v8_to_perl_impl(aTHX_ ctx, elem, seen));
                 if (!nested) {
@@ -171,7 +171,7 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
                 // TODO: check we got a valid key
                 String::Utf8Value key(ctx->isolate, v8_key->ToString());
 
-                Handle<Object> val = Local<Object>::Cast(object->Get(v8_key));
+                Local<Object> val = Local<Object>::Cast(object->Get(v8_key));
                 // TODO: check we got a valid value
 
                 SV* nested = sv_2mortal(pl_v8_to_perl_impl(aTHX_ ctx, val, seen));
@@ -194,9 +194,9 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Handle<Object>& object
     return ret;
 }
 
-static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, HV* seen)
+static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, HV* seen)
 {
-    Handle<Object> ret = Local<Object>::Cast(Null(ctx->isolate));
+    Local<Object> ret = Local<Object>::Cast(Null(ctx->isolate));
     if (!SvOK(value)) {
     } else if (SvIOK(value)) {
         int val = SvIV(value);
@@ -223,7 +223,7 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
                 // duk_push_heapptr(ctx, ptr);
             } else {
                 int array_top = av_top_index(values) + 1;
-                Handle<Array> array = Array::New(ctx->isolate);
+                Local<Array> array = Array::New(ctx->isolate);
                 ret = Local<Object>::Cast(array);
 #if 0
                 void* ptr = duk_get_heapptr(ctx, array_pos);
@@ -237,7 +237,7 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
                     if (!elem || !*elem) {
                         break; /* could not get element */
                     }
-                    const Handle<Object> nested = pl_perl_to_v8_impl(aTHX_ *elem, ctx, seen);
+                    const Local<Object> nested = pl_perl_to_v8_impl(aTHX_ *elem, ctx, seen);
                     // TODO: check for validity
                     //  croak("Could not create JS element for array\n");
                     array->Set(j, nested);
@@ -256,7 +256,7 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
                 // duk_push_heapptr(ctx, ptr);
             } else {
                 Local<Context> context = ctx->isolate->GetCurrentContext();
-                Handle<Object> object = Object::New(ctx->isolate);
+                Local<Object> object = Object::New(ctx->isolate);
                 ret = Local<Object>::Cast(object);
 #if 0
                 void* ptr = duk_get_heapptr(ctx, hash_pos);
@@ -291,7 +291,7 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
                     }
                     SvUTF8_on(value); /* yes, always */ // TODO: only for strings?
 
-                    const Handle<Object> nested = pl_perl_to_v8_impl(aTHX_ value, ctx, seen);
+                    const Local<Object> nested = pl_perl_to_v8_impl(aTHX_ value, ctx, seen);
                     // TODO: check for validity
                     //  croak("Could not create JS element for hash\n");
 
@@ -321,7 +321,7 @@ static const Handle<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, 
     return ret;
 }
 
-SV* pl_v8_to_perl(pTHX_ V8Context* ctx, const Handle<Object>& object)
+SV* pl_v8_to_perl(pTHX_ V8Context* ctx, const Local<Object>& object)
 {
     HV* seen = newHV();
 #if 1
@@ -333,7 +333,7 @@ SV* pl_v8_to_perl(pTHX_ V8Context* ctx, const Handle<Object>& object)
     return ret;
 }
 
-const Handle<Object> pl_perl_to_v8(pTHX_ SV* value, V8Context* ctx)
+const Local<Object> pl_perl_to_v8(pTHX_ SV* value, V8Context* ctx)
 {
     HV* seen = newHV();
     Handle<Object> ret = pl_perl_to_v8_impl(aTHX_ value, ctx, seen);
@@ -383,12 +383,12 @@ int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value)
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
-    Local<Object> object;
+    Local<Object> parent;
     Local<Value> slot;
-    bool found = find_parent(ctx, name, context, object, slot);
+    bool found = find_parent(ctx, name, context, parent, slot);
     if (found) {
-        Handle<Object> v8_value = pl_perl_to_v8(aTHX_ value, ctx);
-        object->Set(slot, v8_value);
+        Local<Object> v8_value = pl_perl_to_v8(aTHX_ value, ctx);
+        parent->Set(slot, v8_value);
         ret = 1;
     }
 
@@ -507,7 +507,7 @@ SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
         }
 
         // Convert the result into Perl data
-        Handle<Object> object = Local<Object>::Cast(result);
+        Local<Object> object = Local<Object>::Cast(result);
         ret = pl_v8_to_perl(aTHX_ ctx, object);
     } while (0);
     if (!ok) {
@@ -591,7 +591,7 @@ bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Loca
     return true;
 }
 
-static const char* get_typeof(V8Context* ctx, const Handle<Object>& object)
+static const char* get_typeof(V8Context* ctx, const Local<Object>& object)
 {
     const char* label = "undefined";
 

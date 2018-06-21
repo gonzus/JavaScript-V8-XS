@@ -30,8 +30,8 @@ class V8Context;
  * pl_perl_to_duk: takes a Perl value and leaves the equivalent JS value at the
  * top of the duktape stack.
  */
-SV* pl_v8_to_perl(pTHX_ V8Context* ctx, const v8::Handle<v8::Object>& object);
-const v8::Handle<v8::Object> pl_perl_to_v8(pTHX_ SV* value, V8Context* ctx);
+SV* pl_v8_to_perl(pTHX_ V8Context* ctx, const Local<Object>& object);
+const Local<Object> pl_perl_to_v8(pTHX_ SV* value, V8Context* ctx);
 
 /*
  * Get the JS value of a global / nested property as Perl data.
