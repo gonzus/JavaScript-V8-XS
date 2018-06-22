@@ -1,3 +1,4 @@
+#include <map>
 #include "pl_stats.h"
 #include "pl_console.h"
 #include "pl_v8.h"
@@ -5,6 +6,25 @@
 #define PL_GC_RUNS 2
 
 using namespace v8;
+
+// A way to compare Local<Object> instances via operator<, which is what a
+// std::map requires for its keys.
+//
+// Notice that we define operator(), NOT operator<.
+struct LocalObjectCompare
+{
+    bool operator() (const Local<Object>& lhs, const Local<Object>& rhs) const
+    {
+        if (lhs == rhs) return 0;
+        return *lhs < *rhs;
+    }
+};
+
+// maps from Perl to JavaScript -- SV* to Local<Object>
+typedef std::map<void*, Local<Object>> MapP2J;
+
+// maps from JavaScript to Perl -- Object* to SV*
+typedef std::map<Local<Object>, void*, LocalObjectCompare> MapJ2P;
 
 struct FuncData {
     FuncData(V8Context* ctx, SV* func) :
@@ -72,7 +92,7 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
     LEAVE;
 }
 
-static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object, HV* seen)
+static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object, MapJ2P& seen)
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
     if (object->IsUndefined()) {
@@ -108,31 +128,25 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
 #endif
     }
     else if (object->IsArray()) {
-        SV** answer = 0;
-#if 0
-        void* ptr = duk_get_heapptr(ctx, pos);
-        char kstr[100];
-        int klen = sprintf(kstr, "%p", ptr);
-        answer = hv_fetch(seen, kstr, klen, 0);
-#endif
-        if (answer) {
+        MapJ2P::iterator k = seen.find(object);
+        if (k != seen.end()) {
+            SV* values = (SV*) k->second;
             /* TODO: weaken reference? */
-            ret = newRV(*answer);
+            ret = newRV(values);
         } else {
             AV* values_array = newAV();
             SV* values = sv_2mortal((SV*) values_array);
-#if 0
-            if (hv_store(seen, kstr, klen, values, 0)) {
-                SvREFCNT_inc(values);
-            }
-#endif
             ret = newRV(values);
+            seen[object] = values;
 
             Local<Array> array = Local<Array>::Cast(object);
             int array_top = array->Length();
             for (int j = 0; j < array_top; ++j) {
-                Local<Object> elem = Local<Object>::Cast(array->Get(j));
+                Local<Value> value = array->Get(j);
+                // TODO: check we got a valid value
+                Local<Object> elem = Local<Object>::Cast(value);
                 // TODO: check we got a valid element
+
                 SV* nested = sv_2mortal(pl_v8_to_perl_impl(aTHX_ ctx, elem, seen));
                 if (!nested) {
                     croak("Could not create Perl SV for array\n");
@@ -144,37 +158,31 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
         }
     }
     else if (object->IsObject()) {
-        SV** answer = 0;
-#if 0
-        void* ptr = duk_get_heapptr(ctx, pos);
-        char kstr[100];
-        int klen = sprintf(kstr, "%p", ptr);
-        answer = hv_fetch(seen, kstr, klen, 0);
-#endif
-        if (answer) {
+        MapJ2P::iterator k = seen.find(object);
+        if (k != seen.end()) {
+            SV* values = (SV*) k->second;
             /* TODO: weaken reference? */
-            ret = newRV(*answer);
+            ret = newRV(values);
         } else {
             HV* values_hash = newHV();
             SV* values = sv_2mortal((SV*) values_hash);
-#if 0
-            if (hv_store(seen, kstr, klen, values, 0)) {
-                SvREFCNT_inc(values);
-            }
-#endif
             ret = newRV(values);
+            seen[object] = values;
 
             Local<Array> property_names = object->GetOwnPropertyNames();
             int hash_top = property_names->Length();
             for (int j = 0; j < hash_top; ++j) {
                 Local<Value> v8_key = property_names->Get(j);
                 // TODO: check we got a valid key
-                String::Utf8Value key(ctx->isolate, v8_key->ToString());
 
-                Local<Object> val = Local<Object>::Cast(object->Get(v8_key));
+                String::Utf8Value key(ctx->isolate, v8_key->ToString());
+                Local<Value> value = object->Get(v8_key);
                 // TODO: check we got a valid value
 
-                SV* nested = sv_2mortal(pl_v8_to_perl_impl(aTHX_ ctx, val, seen));
+                Local<Object> obj = Local<Object>::Cast(value);
+                // TODO: check we got a valid object
+
+                SV* nested = sv_2mortal(pl_v8_to_perl_impl(aTHX_ ctx, obj, seen));
                 if (!nested) {
                     croak("Could not create Perl SV for hash\n");
                 }
@@ -194,7 +202,7 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
     return ret;
 }
 
-static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, HV* seen)
+static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, MapP2J& seen)
 {
     Local<Object> ret = Local<Object>::Cast(Null(ctx->isolate));
     if (!SvOK(value)) {
@@ -211,27 +219,16 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, H
     } else if (SvROK(value)) {
         SV* ref = SvRV(value);
         if (SvTYPE(ref) == SVt_PVAV) {
-            SV** answer = 0;
             AV* values = (AV*) ref;
-#if 0
-            char kstr[100];
-            int klen = sprintf(kstr, "%p", values);
-            answer = hv_fetch(seen, kstr, klen, 0);
-#endif
-            if (answer) {
-                void* ptr = (void*) SvUV(*answer);
-                // duk_push_heapptr(ctx, ptr);
+            MapP2J::iterator k = seen.find(values);
+            if (k != seen.end()) {
+                ret = k->second;
             } else {
                 int array_top = av_top_index(values) + 1;
                 Local<Array> array = Array::New(ctx->isolate);
                 ret = Local<Object>::Cast(array);
-#if 0
-                void* ptr = duk_get_heapptr(ctx, array_pos);
-                SV* uptr = sv_2mortal(newSVuv(PTR2UV(ptr)));
-                if (hv_store(seen, kstr, klen, uptr, 0)) {
-                    SvREFCNT_inc(uptr);
-                }
-#endif
+                seen[values] = ret;
+
                 for (int j = 0; j < array_top; ++j) {
                     SV** elem = av_fetch(values, j, 0);
                     if (!elem || !*elem) {
@@ -244,27 +241,16 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, H
                 }
             }
         } else if (SvTYPE(ref) == SVt_PVHV) {
-            SV** answer = 0;
             HV* values = (HV*) ref;
-#if 0
-            char kstr[100];
-            int klen = sprintf(kstr, "%p", values);
-            answer = hv_fetch(seen, kstr, klen, 0);
-#endif
-            if (answer) {
-                void* ptr = (void*) SvUV(*answer);
-                // duk_push_heapptr(ctx, ptr);
+            MapP2J::iterator k = seen.find(values);
+            if (k != seen.end()) {
+                ret = k->second;
             } else {
                 Local<Context> context = ctx->isolate->GetCurrentContext();
                 Local<Object> object = Object::New(ctx->isolate);
                 ret = Local<Object>::Cast(object);
-#if 0
-                void* ptr = duk_get_heapptr(ctx, hash_pos);
-                SV* uptr = sv_2mortal(newSVuv(PTR2UV(ptr)));
-                if (hv_store(seen, kstr, klen, uptr, 0)) {
-                    SvREFCNT_inc(uptr);
-                }
-#endif
+                seen[values] = ret;
+
                 hv_iterinit(values);
                 while (1) {
                     SV* key = 0;
@@ -296,14 +282,10 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, H
                     //  croak("Could not create JS element for hash\n");
 
                     Local<Value> v8_key = String::NewFromUtf8(ctx->isolate, kstr, NewStringType::kNormal).ToLocalChecked();
-                    Maybe<bool> check = object->Set(context, v8_key, nested);
-                    if (check.IsNothing() || !check.FromMaybe(false)) {
-                        croak("Could not set JS element for object\n");
-                    }
+                    object->Set(v8_key, nested);
                 }
             }
         } else if (SvTYPE(ref) == SVt_PVCV) {
-#if 1
             FuncData* data = new FuncData(ctx, value);
             Local<Value> val = External::New(ctx->isolate, data);
             Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, perl_caller, val);
@@ -311,7 +293,6 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, H
             Local<Function> v8_func = ft->GetFunction();
             v8_func->Set(v8_key, val);
             ret = Local<Object>::Cast(v8_func);
-#endif
         } else {
             croak("Don't know how to deal with an undetermined Perl reference\n");
         }
@@ -323,37 +304,16 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, H
 
 SV* pl_v8_to_perl(pTHX_ V8Context* ctx, const Local<Object>& object)
 {
-    HV* seen = newHV();
-#if 1
-    HandleScope handle_scope(ctx->isolate);
-#endif
-
+    MapJ2P seen;
     SV* ret = pl_v8_to_perl_impl(aTHX_ ctx, object, seen);
-    hv_undef(seen);
     return ret;
 }
 
 const Local<Object> pl_perl_to_v8(pTHX_ SV* value, V8Context* ctx)
 {
-    HV* seen = newHV();
-    Handle<Object> ret = pl_perl_to_v8_impl(aTHX_ value, ctx, seen);
-    hv_undef(seen);
-#if 0
-    HandleScope handle_scope(ctx->isolate);
-#endif
+    MapP2J seen;
+    Local<Object> ret = pl_perl_to_v8_impl(aTHX_ value, ctx, seen);
     return ret;
-}
-
-static int find_last_dot(const char* name, int* len)
-{
-    int last_dot = -1;
-    *len = 0;
-    for (; name[*len] != '\0'; ++*len) {
-        if (name[*len] == '.') {
-            last_dot = *len;
-        }
-    }
-    return last_dot;
 }
 
 SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name)
@@ -361,7 +321,6 @@ SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name)
     SV* ret = &PL_sv_undef; /* return undef by default */
 
     HandleScope handle_scope(ctx->isolate);
-
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
@@ -379,7 +338,6 @@ int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value)
     int ret = 0;
 
     HandleScope handle_scope(ctx->isolate);
-
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
@@ -387,8 +345,8 @@ int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value)
     Local<Value> slot;
     bool found = find_parent(ctx, name, context, parent, slot);
     if (found) {
-        Local<Object> v8_value = pl_perl_to_v8(aTHX_ value, ctx);
-        parent->Set(slot, v8_value);
+        Local<Object> object = pl_perl_to_v8(aTHX_ value, ctx);
+        parent->Set(slot, object);
         ret = 1;
     }
 
@@ -400,7 +358,6 @@ SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name)
     SV* ret = &PL_sv_no; /* return false by default */
 
     HandleScope handle_scope(ctx->isolate);
-
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
@@ -418,7 +375,6 @@ SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
     const char* cstr = "undefined";
 
     HandleScope handle_scope(ctx->isolate);
-
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
