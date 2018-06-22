@@ -6,6 +6,7 @@
 #include <poll.h>
 #include <v8.h>
 #include "pl_util.h"
+#include "pl_eval.h"
 #include "pl_eventloop.h"
 
 #if !defined(EVENTLOOP_DEBUG)
@@ -122,20 +123,7 @@ static void expire_timers(V8Context* ctx) {
         fprintf(stderr, "> calling user callback for timer id %d\n", (int) t->id);
         fflush(stderr);
 #endif
-        HandleScope handle_scope(ctx->isolate);
-        Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
-        Context::Scope context_scope(context);
-
-        Local<Value> global = context->Global();
-        Local<Function> v8_func = Local<Function>::New(ctx->isolate, t->v8_func);
-
-        TryCatch try_catch(ctx->isolate);
-        Local<Value> result;
-        if (!v8_func->Call(context, global, 0, 0).ToLocal(&result)) {
-            String::Utf8Value error(ctx->isolate, try_catch.Exception());
-            fprintf(stderr, "%s\n", *error);
-        }
-
+        pl_run_function(ctx, t->v8_func);
 #if EVENTLOOP_DEBUG > 0
         fprintf(stderr, "> called user callback for timer id %d\n", (int) t->id);
         fflush(stderr);

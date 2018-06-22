@@ -1,5 +1,7 @@
 #include "libplatform/libplatform.h"
 #include "pl_util.h"
+#include "pl_v8.h"
+#include "pl_eval.h"
 #include "pl_native.h"
 #include "pl_console.h"
 #include "pl_eventloop.h"
