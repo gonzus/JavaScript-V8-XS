@@ -7,6 +7,7 @@
 #include <v8.h>
 #include "pl_util.h"
 #include "pl_eval.h"
+#include "pl_console.h"
 #include "pl_eventloop.h"
 
 #if !defined(EVENTLOOP_DEBUG)
@@ -145,7 +146,7 @@ static void expire_timers(V8Context* ctx) {
 #endif
             if (timer_count >= MAX_TIMERS) {
                 // TODO error out of here
-                fprintf(stderr, "out of timer slots, max is %ld\n", (long) MAX_TIMERS);
+                pl_show_error(ctx, "out of timer slots, max is %ld", (long) MAX_TIMERS);
                 fflush(stderr);
             }
             memcpy((void *) (timer_list + timer_count), (void *) t, sizeof(ev_timer));
@@ -218,14 +219,17 @@ int eventloop_run(V8Context* ctx) {
 
 static void create_timer(const FunctionCallbackInfo<Value>& args)
 {
+    Local<External> v8_val = Local<External>::Cast(args.Data());
+    V8Context* ctx = (V8Context*) v8_val->Value();
+
     if (timer_count >= MAX_TIMERS) {
         // TODO: error out of here
-        fprintf(stderr, "Too many timers, max is %ld\n", (long) MAX_TIMERS);
+        pl_show_error(ctx, "Too many timers, max is %ld", (long) MAX_TIMERS);
         abort();
     }
     if (args.Length() != 3) {
         // TODO: error out of here
-        fprintf(stderr, "create_timer() needs 3 args, got %d\n", args.Length());
+        pl_show_error(ctx, "create_timer() needs 3 args, got %d", args.Length());
         abort();
     }
 
@@ -268,9 +272,12 @@ static void create_timer(const FunctionCallbackInfo<Value>& args)
 
 static void delete_timer(const FunctionCallbackInfo<Value>& args)
 {
+    Local<External> v8_val = Local<External>::Cast(args.Data());
+    V8Context* ctx = (V8Context*) v8_val->Value();
+
     if (args.Length() != 1) {
         // TODO: error out of here
-        fprintf(stderr, "delete_timer() needs 1 arg, got %d\n", args.Length());
+        pl_show_error(ctx, "delete_timer() needs 1 arg, got %d", args.Length());
         abort();
     }
 
@@ -360,10 +367,11 @@ int pl_register_eventloop_functions(V8Context* ctx)
         Local<Value> slot;
         bool found = find_parent(ctx, data[j].name, context, object, slot, true);
         if (!found) {
-            fprintf(stderr, "could not create parent for %s\n", data[j].name);
+            pl_show_error(ctx, "could not create parent for %s", data[j].name);
             continue;
         }
-        Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, data[j].func);
+        Local<Value> v8_val = External::New(ctx->isolate, ctx);
+        Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, data[j].func, v8_val);
         Local<Function> v8_func = ft->GetFunction();
         object->Set(slot, v8_func);
     }

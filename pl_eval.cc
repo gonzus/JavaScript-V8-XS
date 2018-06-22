@@ -12,8 +12,11 @@ static const char* ToCString(const String::Utf8Value& value)
   return *value ? *value : "<string conversion failed>";
 }
 
-static void ReportException(Isolate* isolate, TryCatch* try_catch)
+static void ReportException(pTHX_ V8Context* ctx, TryCatch* try_catch)
 {
+    SV* buffer = newSVpvs("");
+
+    Isolate* isolate = ctx->isolate;
     HandleScope handle_scope(isolate);
     String::Utf8Value exception(isolate, try_catch->Exception());
     const char* exception_string = ToCString(exception);
@@ -21,7 +24,7 @@ static void ReportException(Isolate* isolate, TryCatch* try_catch)
     if (message.IsEmpty()) {
         // V8 didn't provide any extra information about this error; just
         // print the exception.
-        fprintf(stderr, "%s\n", exception_string);
+        Perl_sv_catpvf(aTHX_ buffer, "%s\n", exception_string);
     } else {
         // Print (filename):(line number): (message).
         String::Utf8Value filename(isolate,
@@ -29,31 +32,37 @@ static void ReportException(Isolate* isolate, TryCatch* try_catch)
         Local<Context> context(isolate->GetCurrentContext());
         const char* filename_string = ToCString(filename);
         int linenum = message->GetLineNumber(context).FromJust();
-        fprintf(stderr, "%s:%i: %s\n", filename_string, linenum, exception_string);
+        Perl_sv_catpvf(aTHX_ buffer, "%s:%i: %s", filename_string, linenum, exception_string);
         // Print line of source code.
         String::Utf8Value sourceline(
                 isolate, message->GetSourceLine(context).ToLocalChecked());
         const char* sourceline_string = ToCString(sourceline);
-        fprintf(stderr, "%s\n", sourceline_string);
+        Perl_sv_catpvf(aTHX_ buffer, "%s\n", sourceline_string);
+
         // Print wavy underline (GetUnderline is deprecated).
         int start = message->GetStartColumn(context).FromJust();
         for (int i = 0; i < start; i++) {
-            fprintf(stderr, " ");
+            Perl_sv_catpvf(aTHX_ buffer, " ");
         }
         int end = message->GetEndColumn(context).FromJust();
         for (int i = start; i < end; i++) {
-            fprintf(stderr, "^");
+            Perl_sv_catpvf(aTHX_ buffer, "^");
         }
-        fprintf(stderr, "\n");
+        Perl_sv_catpvf(aTHX_ buffer, "\n");
+
+        // Print stacktrace if any
         Local<Value> stack_trace_string;
         if (try_catch->StackTrace(context).ToLocal(&stack_trace_string) &&
                 stack_trace_string->IsString() &&
                 Local<String>::Cast(stack_trace_string)->Length() > 0) {
             String::Utf8Value stack_trace(isolate, stack_trace_string);
             const char* stack_trace_string = ToCString(stack_trace);
-            fprintf(stderr, "%s\n", stack_trace_string);
+            Perl_sv_catpvf(aTHX_ buffer, "%s\n", stack_trace_string);
         }
     }
+    STRLEN blen = 0;
+    char* bstr = SvPV(buffer, blen);
+    pl_show_error(ctx, "%s", bstr);
 }
 
 SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
@@ -115,12 +124,11 @@ SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
     } while (0);
     if (!ok) {
         if (try_catch.HasCaught()) {
-            fprintf(stderr, "REPORT exception\n");
-            ReportException(ctx->isolate, &try_catch);
-
-            fprintf(stderr, "SHOW error\n");
+            ReportException(aTHX_ ctx, &try_catch);
+#if 0
             String::Utf8Value error(ctx->isolate, try_catch.Exception());
             pl_show_error(ctx, *error);
+#endif
         }
     }
     delete origin;
@@ -129,6 +137,8 @@ SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
 
 int pl_run_function(V8Context* ctx, Persistent<Function>& func)
 {
+    dTHX;
+
     HandleScope handle_scope(ctx->isolate);
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
@@ -147,12 +157,11 @@ int pl_run_function(V8Context* ctx, Persistent<Function>& func)
     } while (0);
     if (!ok) {
         if (try_catch.HasCaught()) {
-            fprintf(stderr, "REPORT exception\n");
-            ReportException(ctx->isolate, &try_catch);
-
-            fprintf(stderr, "SHOW error\n");
+            ReportException(aTHX_ ctx, &try_catch);
+#if 0
             String::Utf8Value error(ctx->isolate, try_catch.Exception());
             pl_show_error(ctx, *error);
+#endif
         }
     }
     return ok;

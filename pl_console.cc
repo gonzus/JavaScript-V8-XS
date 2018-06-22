@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdio.h>
 #include <v8.h>
 #include "pl_util.h"
@@ -41,7 +42,7 @@ static void save_msg(pTHX_ V8Context* ctx, const char* target, SV* message)
     }
 }
 
-static int console_output_string(V8Context* ctx, SV* message, unsigned int flags)
+static int console_output_line(V8Context* ctx, SV* message, unsigned int flags)
 {
     dTHX;
 
@@ -96,6 +97,7 @@ static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int 
         String::Utf8Value str(isolate, json);
         Perl_sv_catpvn(aTHX_ message, *str, str.length());
     }
+    Perl_sv_catpvn(aTHX_ message, "\n", 1);
     if (stack) {
 #if 0
         // TODO: generate a stack trace
@@ -104,7 +106,7 @@ static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int 
 #endif
     }
 
-    return console_output_string(ctx, message, flags);
+    return console_output_line(ctx, message, flags);
 }
 
 static void console_assert(const FunctionCallbackInfo<Value>& args)
@@ -186,7 +188,7 @@ int pl_register_console_functions(V8Context* ctx)
         Local<Value> slot;
         bool found = find_parent(ctx, data[j].name, context, object, slot, true);
         if (!found) {
-            fprintf(stderr, "could not create parent for %s\n", data[j].name);
+            pl_show_error(ctx, "could not create parent for %s", data[j].name);
             continue;
         }
         Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, data[j].func, v8_ctx);
@@ -196,9 +198,12 @@ int pl_register_console_functions(V8Context* ctx)
     return n;
 }
 
-int pl_show_error(V8Context* ctx, const char* mstr)
+int pl_show_error(V8Context* ctx, const char* fmt, ...)
 {
-    STRLEN mlen = 0;
-    SV* message = newSVpv(mstr, mlen);
-    return console_output_string(ctx, message, CONSOLE_TARGET_STDERR | CONSOLE_FLUSH);
+    SV* message = newSVpvs("");
+    va_list ap;
+    va_start(ap, fmt);
+    Perl_sv_vcatpvf(aTHX_ message, fmt, &ap);
+    va_end(ap);
+    return console_output_line(ctx, message, CONSOLE_TARGET_STDERR | CONSOLE_FLUSH);
 }
