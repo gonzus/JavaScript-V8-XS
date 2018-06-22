@@ -391,36 +391,26 @@ SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
 
 SV* pl_instanceof_global_or_property(pTHX_ V8Context* ctx, const char* oname, const char* cname)
 {
-#if 1
-    // TODO: hack alert
-    // This is here only because the real implementation below doesn't work
-    char code[1024];
-    sprintf(code, "%s instanceof %s", oname, cname);
-    return pl_eval(aTHX_ ctx, code);
-#else
     SV* ret = &PL_sv_no; /* return false by default */
 
     HandleScope handle_scope(ctx->isolate);
-
     Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
     Context::Scope context_scope(context);
 
-    Local<Object> object;
-    bool found = find_object(ctx, oname, context, object);
+    Local<Object> oobject;
+    bool found = find_object(ctx, oname, context, oobject); // look up object
     if (found) {
-        Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate);
-        Local<String> v8_name = String::NewFromUtf8(ctx->isolate, cname, NewStringType::kNormal).ToLocalChecked();
-        ft->SetClassName(v8_name);
-        if (ft->HasInstance(object)) {
-            ret = &PL_sv_yes;
-        }
-        else {
-            fprintf(stderr, "GONZO [%s]\n", cname);
+        Local<Object> cobject;
+        found = find_object(ctx, cname, context, cobject); // look up class
+        if (found) {
+            Maybe<bool> ok = oobject->InstanceOf(context, cobject);
+            if (ok.ToChecked()) { // check if object instanceof class
+                ret = &PL_sv_yes;
+            }
         }
     }
 
     return ret;
-#endif
 }
 
 SV* pl_eval(pTHX_ V8Context* ctx, const char* code, const char* file)
