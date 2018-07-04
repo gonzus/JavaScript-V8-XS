@@ -3,7 +3,7 @@ use warnings;
 
 use Data::Dumper;
 use Test::More;
-use Test::Output;
+use Test::Output qw/ output_from /;
 
 my $CLASS = 'JavaScript::V8::XS';
 

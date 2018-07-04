@@ -3,7 +3,7 @@ use warnings;
 
 use Data::Dumper;
 use Test::More;
-use Test::Output;
+use Test::Output qw/ stdout_like /;
 
 my $CLASS = 'JavaScript::V8::XS';
 
@@ -117,11 +117,11 @@ sub test_roundtrip {
         my $js_name = "js_$name";
         $test_name = $name;
         $expected_args = $args;
-        # my $got_eval = $vm->eval("$js_name = perl_test.apply(this, $name)");
-        # is_deeply($got_eval, $args, "calling perl_test() works for $name");
+        my $got_eval = $vm->eval("$js_name = perl_test.apply(null, $name)");
+        is_deeply($got_eval, $args, "calling perl_test() works for $name");
 
-        # my $got_get = $vm->get($js_name);
-        # is_deeply($got_get, $args, "return value from perl_test() works for $name");
+        my $got_get = $vm->get($js_name);
+        is_deeply($got_get, $args, "return value from perl_test() works for $name");
     }
 }
 
