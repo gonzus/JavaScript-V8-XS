@@ -43,8 +43,6 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
     HandleScope handle_scope(isolate);
 #endif
 
-    Local<Function> v8_func = Local<Function>::Cast(args.This());
-
 #if 1
     Local<External> v8_val = Local<External>::Cast(args.Data());
 #else
@@ -53,6 +51,7 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
     // doesn't work, so we have to pass the data we want so that args.Data()
     // can return it.
     Local<Name> v8_key = String::NewFromUtf8(isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
+    Local<Function> v8_func = Local<Function>::Cast(args.This());
     Local<External> v8_val = Local<External>::Cast(v8_func->Get(v8_key));
 #endif
     FuncData* data = (FuncData*) v8_val->Value();
@@ -113,7 +112,6 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
         SvUTF8_on(ret); /* yes, always */
     }
     else if (object->IsFunction()) {
-        Local<Function> v8_func = Local<Function>::Cast(object);
         Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
         Local<External> v8_val = Local<External>::Cast(object->Get(v8_key));
         FuncData* data = (FuncData*) v8_val->Value();
@@ -246,7 +244,6 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, M
             if (k != seen.end()) {
                 ret = k->second;
             } else {
-                Local<Context> context = ctx->isolate->GetCurrentContext();
                 Local<Object> object = Object::New(ctx->isolate);
                 ret = Local<Object>::Cast(object);
                 seen[values] = ret;

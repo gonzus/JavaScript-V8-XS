@@ -78,7 +78,6 @@ static void expire_timers(V8Context* ctx) {
     ev_timer *t;
     int sanity = MAX_EXPIRIES;
     double now;
-    int rc;
 
     /* Because a user callback can mutate the timer list (by adding or deleting
      * a timer), we expire one timer and then rescan from the end again.  There
@@ -387,7 +386,7 @@ SV* pl_run_function_in_event_loop(pTHX_ V8Context* ctx, const char* func)
     pl_eval(aTHX_ ctx, js);
 
     /* Launch eventloop; this call only returns after the eventloop terminates. */
-    int rc = eventloop_run(ctx);
+    eventloop_run(ctx);
 
     return &PL_sv_yes;
 }
