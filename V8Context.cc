@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "libplatform/libplatform.h"
 #include "pl_util.h"
 #include "pl_v8.h"
@@ -8,6 +9,10 @@
 #include "pl_inlined.h"
 #include "pl_stats.h"
 #include "V8Context.h"
+
+#define ICU_DTL_DATA         "icudtl.dat"
+#define V8_NATIVES_BLOB      "natives_blob.bin"
+#define V8_SNAPSHOT_BLOB     "snapshot_blob.bin"
 
 #define MAX_MEMORY_MINIMUM  (128 * 1024) /* 128 KB */
 #define MAX_TIMEOUT_MINIMUM (500000)     /* 500_000 us = 500 ms = 0.5 s */
@@ -235,13 +240,62 @@ void V8Context::register_functions()
     pl_register_console_functions(this);
 }
 
+const char* get_data_path()
+{
+    static const char* locations[] = {
+        "/usr/lib64",
+        "/usr/lib",
+    };
+    static const char* files[] = {
+        ICU_DTL_DATA,
+        V8_NATIVES_BLOB,
+        V8_SNAPSHOT_BLOB,
+    };
+
+    int num_locations = sizeof(locations) / sizeof(locations[0]);
+    for (int j = 0; j < num_locations; ++j) {
+        int num_files = sizeof(files) / sizeof(files[0]);
+        int found = 0;
+        for (int k = 0; k < num_files; ++k) {
+            char full[1024];
+            sprintf(full, "%s/%s", locations[j], files[k]);
+            if (access(full, R_OK) != 0) {
+                continue;
+            }
+            ++found;
+        }
+        if (found < num_locations) {
+            continue;
+        }
+        // found all required files -- yipee!
+        return locations[j];
+    }
+
+    // fallback -- it might fail
+    return ".";
+}
+
 void V8Context::initialize_v8(V8Context* self)
 {
     if (instance_count++) {
         return;
     }
-    V8::InitializeICUDefaultLocation(self->program);
-    V8::InitializeExternalStartupData(self->program);
+
+    // get location for our V8 binary files
+    const char* data_path = get_data_path();
+
+    // initialize ICU, make it point to that path
+    char icu_dtl_data[1024];
+    sprintf(icu_dtl_data, "%s/%s", data_path, ICU_DTL_DATA);
+    V8::InitializeICUDefaultLocation(self->program, icu_dtl_data);
+
+    // initialize V8 with the appropriate blob files
+    char natives_blob[1024];
+    char snapshot_blob[1024];
+    sprintf(natives_blob, "%s/%s", data_path, V8_NATIVES_BLOB);
+    sprintf(snapshot_blob, "%s/%s", data_path, V8_SNAPSHOT_BLOB);
+    V8::InitializeExternalStartupData(natives_blob, snapshot_blob);
+
     platform = platform::NewDefaultPlatform();
     V8::InitializePlatform(platform.get());
     V8::Initialize();
