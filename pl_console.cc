@@ -77,27 +77,27 @@ static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int 
     bool separate = false;
     if (preamble) {
         Perl_sv_catpv(aTHX_ message, preamble);
-        Perl_sv_catpvn(aTHX_ message, ":", 1);
+        Perl_sv_catpvf(aTHX_ message, ":");
         separate = true;
     }
     for (int j = start; j < args.Length(); j++) {
         // add separator if necessary
         if (separate) {
-            Perl_sv_catpvn(aTHX_ message, " ", 1);
+            Perl_sv_catpvf(aTHX_ message, " ");
         }
         separate = true;
         // for non-objects, just get their value as string
         if (!args[j]->IsObject()) {
             String::Utf8Value str(isolate, args[j]);
-            Perl_sv_catpvn(aTHX_ message, *str, str.length());
+            Perl_sv_catpvf(aTHX_ message, "%s", *str);
             continue;
         }
         // convert objects to JSON
         Local<String> json = JSON::Stringify(context, args[j]).ToLocalChecked();
         String::Utf8Value str(isolate, json);
-        Perl_sv_catpvn(aTHX_ message, *str, str.length());
+        Perl_sv_catpvf(aTHX_ message, "%s", *str);
     }
-    Perl_sv_catpvn(aTHX_ message, "\n", 1);
+    Perl_sv_catpvf(aTHX_ message, "\n");
     if (stack) {
 #if 0
         // TODO: generate a stack trace
