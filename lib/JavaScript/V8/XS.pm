@@ -36,9 +36,10 @@ sub _get_js_source_fragment {
 }
 
 sub parse_js_stacktrace {
-    my ($self, $stacktrace_lines, $desired_frames) = @_;
+    my ($self, $stacktrace_lines, $desired_frames, $priority_files) = @_;
 
     $desired_frames //= 1;
+    my %priority_files = map +( $_ => 1 ), @{ $priority_files // [] };
 
     # @contexts => [ {
     #   message => "undefined variable foo",
@@ -54,7 +55,8 @@ sub parse_js_stacktrace {
     #       ],
     #   }, {...} ]
     #   } ]
-    my @contexts;
+    my @contexts_hiprio;
+    my @contexts_normal;
     foreach my $line (@$stacktrace_lines) {
         $line = trim($line);
         next unless $line;
@@ -68,7 +70,8 @@ sub parse_js_stacktrace {
 
             $context{message} = $text unless exists $context{message};
 
-            next unless $text =~ m/^\s*at\s*(\S*)\s*\(([^:]*):([0-9]+)(:([0-9]+))?\)\s*$/;
+            next unless $text =~ m/^\s*at\s*(\S*)\s*\(([^:]*):([0-9]+)(:([0-9]+))?\)/;
+
             push @{ $context{frames} //= [] }, {
                 file => $2,
                 line => $3,
@@ -76,10 +79,19 @@ sub parse_js_stacktrace {
             last if scalar @{ $context{frames} } >= $desired_frames;
         }
         next unless exists $context{message};
+        next unless scalar @{ $context{frames} };
+        my $top_file = $context{frames}[0]{file};
+        next unless $top_file;
+
         _get_js_source_fragment(\%context);
-        push @contexts, \%context;
+        if ($priority_files && exists $priority_files{$top_file}) {
+            push @contexts_hiprio, \%context;
+        }
+        else {
+            push @contexts_normal, \%context;
+        }
     }
-    return \@contexts;
+    return [ @contexts_hiprio, @contexts_normal ];
 }
 
 1;
