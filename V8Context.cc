@@ -9,6 +9,9 @@
 #include "pl_stats.h"
 #include "V8Context.h"
 
+#define MAX_MEMORY_MINIMUM  (128 * 1024) /* 128 KB */
+#define MAX_TIMEOUT_MINIMUM (500000)     /* 500_000 us = 500 ms = 0.5 s */
+
 #define ENTER_SCOPE \
     Isolate::Scope isolate_scope(isolate); \
     HandleScope handle_scope(isolate)
@@ -62,7 +65,6 @@ V8Context::V8Context(HV* opt)
                 flags |= SvTRUE(value) ? V8_OPT_FLAG_SAVE_MESSAGES : 0;
                 continue;
             }
-#if 0
             if (memcmp(kstr, V8_OPT_NAME_MAX_MEMORY_BYTES, klen) == 0) {
                 int param = SvIV(value);
                 max_allocated_bytes = param > MAX_MEMORY_MINIMUM ? param : MAX_MEMORY_MINIMUM;
@@ -73,7 +75,6 @@ V8Context::V8Context(HV* opt)
                 max_timeout_us = param > MAX_TIMEOUT_MINIMUM ? param : MAX_TIMEOUT_MINIMUM;
                 continue;
             }
-#endif
             croak("Unknown option %*.*s\n", (int) klen, (int) klen, kstr);
         }
     }

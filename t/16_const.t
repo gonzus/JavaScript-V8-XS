@@ -7,10 +7,10 @@ use Test::More;
 
 my $CLASS = 'JavaScript::V8::XS';
 
-sub test_const {
+sub test_declarations {
     my %types = (
-        const => 1,
-        let   => 1,
+        const => 0,  # not supported yet in V8
+        let   => 0,  # not supported yet in V8
         var   => 1,
     );
     for my $type (sort keys %types) {
@@ -37,7 +37,7 @@ sub test_const {
 sub main {
     use_ok($CLASS);
 
-    test_const();
+    test_declarations();
     done_testing;
     return 0;
 }
