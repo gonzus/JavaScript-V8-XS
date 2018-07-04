@@ -34,7 +34,7 @@ struct FuncData {
     SV* func;
 };
 
-static const char* get_typeof(V8Context* ctx, const Local<Object>& object);
+static const char* get_typeof(const Local<Object>& object);
 
 static void perl_caller(const FunctionCallbackInfo<Value>& args)
 {
@@ -378,7 +378,7 @@ SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
     Local<Object> object;
     bool found = find_object(ctx, name, context, object);
     if (found) {
-        cstr = get_typeof(ctx, object);
+        cstr = get_typeof(object);
     }
 
     STRLEN clen = 0;
@@ -482,7 +482,7 @@ bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Loca
     return true;
 }
 
-static const char* get_typeof(V8Context* ctx, const Local<Object>& object)
+static const char* get_typeof(const Local<Object>& object)
 {
     const char* label = "undefined";
 

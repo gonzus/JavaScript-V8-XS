@@ -247,7 +247,7 @@ void V8Context::initialize_v8(V8Context* self)
     V8::Initialize();
 }
 
-void V8Context::terminate_v8(V8Context* self)
+void V8Context::terminate_v8(V8Context*)
 {
     if (--instance_count) {
         return;
