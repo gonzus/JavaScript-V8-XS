@@ -6,7 +6,7 @@ my @V8_INCS;
 my @V8_LIBS;
 
 # these apply always
-push @V8_CC_OPTS, qw< -Wall -Werror -O2 --std=c++11 >;
+push @V8_CC_OPTS, qw< -Wall -Wextra -O2 --std=c++11 >;
 push @V8_LIBS, qw< v8 v8_libbase v8_libplatform icuuc icui18n >;
 
 if ($^O eq 'linux') {
