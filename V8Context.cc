@@ -245,6 +245,7 @@ const char* get_data_path()
     static const char* locations[] = {
         "/usr/lib64",
         "/usr/lib",
+        "/usr/local/lib",
     };
     static const char* files[] = {
         ICU_DTL_DATA,
