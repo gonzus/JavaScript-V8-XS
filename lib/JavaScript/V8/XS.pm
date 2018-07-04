@@ -6,7 +6,7 @@ use parent 'Exporter';
 use Text::Trim qw(trim rtrim);
 use XSLoader;
 
-our $VERSION = '0.000001';
+our $VERSION = '0.000002';
 XSLoader::load( __PACKAGE__, $VERSION );
 
 our @EXPORT_OK = qw[];
@@ -95,7 +95,7 @@ JavaScript::V8::XS - Perl XS binding for the V8 JavaScript engine
 
 =head1 VERSION
 
-Version 0.000001
+Version 0.000002
 
 =head1 SYNOPSIS
 
