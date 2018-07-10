@@ -156,6 +156,29 @@ This module provides an XS wrapper to call V8 from Perl.
 The wrapper is used in an OO way: you create an instance of
 C<JavaScript::V8::XS> and then invoke functions on it.
 
+=head1 DEPENDENCIES
+
+This module requires that recent versions of the V8 and ICU libraries have
+already been installed in your system.
+
+At the time of writing, versions used were V8 6.7 and ICU 61.
+
+The module does not attempt to download / install these required external
+dependencies:
+
+=over 4
+
+=item * header files
+
+=item * shared libraries
+
+=item * V8 blobs, usually generated at compilation time (C<natives_blob.bin>
+and C<snapshot_blob.bin>)
+
+=item * ICU data files (C<icudtl.dat>)
+
+=back
+
 =head1 METHODS/ATTRIBUTES
 
 =head2 new
