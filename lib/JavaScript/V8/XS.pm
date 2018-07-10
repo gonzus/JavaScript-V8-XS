@@ -296,8 +296,13 @@ number of rounds that were effectively run.
 
 =head1 SEE ALSO
 
-L<< https://metacpan.org/pod/JavaScript::V8 >>
-L<< https://metacpan.org/pod/JavaScript::Duktape::XS >>
+=over 4
+
+=item * L<< https://metacpan.org/pod/JavaScript::V8 >>
+
+=item * L<< https://metacpan.org/pod/JavaScript::Duktape::XS >>
+
+=back
 
 =head1 LICENSE
 
