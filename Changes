@@ -1,3 +1,7 @@
+0.000003    2018-07-10
+            * Code that display source for errors now is similar to Duktape's.
+            * Clean up and expand perldoc.
+
 0.000002    2018-07-04
             * First public release.
 
