@@ -185,6 +185,18 @@ SV* V8Context::dispatch_function_in_event_loop(const char* func)
     return ret;
 }
 
+SV* V8Context::global_objects()
+{
+    ENTER_SCOPE;
+    set_up();
+
+    Perf perf;
+    pl_stats_start(aTHX_ this, &perf);
+    SV* ret = pl_global_objects(aTHX_ this);
+    pl_stats_stop(aTHX_ this, &perf, "global_objects");
+    return ret;
+}
+
 int V8Context::run_gc()
 {
     ENTER_SCOPE;

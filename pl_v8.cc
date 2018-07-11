@@ -410,6 +410,28 @@ SV* pl_instanceof_global_or_property(pTHX_ V8Context* ctx, const char* oname, co
     return ret;
 }
 
+SV* pl_global_objects(pTHX_ V8Context* ctx)
+{
+    HandleScope handle_scope(ctx->isolate);
+    Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
+    Context::Scope context_scope(context);
+
+    Local<Object> global = context->Global();
+    Local<Array> property_names = global->GetOwnPropertyNames();
+    int count = 0;
+    AV* values = newAV();
+    for (uint32_t j = 0; j < property_names->Length(); ++j) {
+        Local<Value> v8_key = property_names->Get(j);
+        // TODO: check we got a valid key
+        String::Utf8Value key(ctx->isolate, v8_key->ToString());
+        SV* name = sv_2mortal(newSVpvn(*key, key.length()));
+        if (av_store(values, count, name)) {
+            SvREFCNT_inc(name);
+            ++count;
+        }
+    }
+    return newRV((SV*) values);
+}
 int pl_run_gc(V8Context* ctx)
 {
     // Run PL_GC_RUNS GC rounds

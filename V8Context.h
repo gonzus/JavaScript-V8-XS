@@ -34,6 +34,8 @@ class V8Context {
 
         SV* dispatch_function_in_event_loop(const char* func);
 
+        SV* global_objects();
+
         int run_gc();
 
         HV* get_stats();
