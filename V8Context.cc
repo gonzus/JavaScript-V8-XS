@@ -10,6 +10,7 @@
 #include "pl_stats.h"
 #include "V8Context.h"
 
+#define PROGRAM_NAME         "JavaScript-V8-XS"
 #define ICU_DTL_DATA         "icudtl.dat"
 #define V8_NATIVES_BLOB      "natives_blob.bin"
 #define V8_SNAPSHOT_BLOB     "snapshot_blob.bin"
@@ -27,10 +28,7 @@ std::unique_ptr<Platform> V8Context::platform = 0;
 V8Context::V8Context(HV* opt)
     : inited(0)
 {
-    program = new char[256];
-    sprintf(program, "program_%05d", instance_count);
-
-    V8Context::initialize_v8(this);
+    V8Context::initialize_v8();
 
     // Create a new Isolate and make it the current one.
     create_params.array_buffer_allocator =
@@ -104,14 +102,13 @@ V8Context::~V8Context()
 {
     isolate->Dispose();
     delete create_params.array_buffer_allocator;
-    delete[] program;
 
 #if 0
     // We should terminate v8 at some point.  However, because the calling code
     // may create multiple instances of V8Context, whether "nested" or
     // "sequential", we cannot just assume we should do this.  For now, we just
     // *never* terminate v8.
-    V8Context::terminate_v8(this);
+    V8Context::terminate_v8();
 #endif
 }
 
@@ -276,7 +273,7 @@ const char* get_data_path()
     return ".";
 }
 
-void V8Context::initialize_v8(V8Context* self)
+void V8Context::initialize_v8()
 {
     if (instance_count++) {
         return;
@@ -288,7 +285,7 @@ void V8Context::initialize_v8(V8Context* self)
     // initialize ICU, make it point to that path
     char icu_dtl_data[1024];
     sprintf(icu_dtl_data, "%s/%s", data_path, ICU_DTL_DATA);
-    V8::InitializeICUDefaultLocation(self->program, icu_dtl_data);
+    V8::InitializeICUDefaultLocation(PROGRAM_NAME, icu_dtl_data);
 
     // initialize V8 with the appropriate blob files
     char natives_blob[1024];
@@ -302,7 +299,7 @@ void V8Context::initialize_v8(V8Context* self)
     V8::Initialize();
 }
 
-void V8Context::terminate_v8(V8Context*)
+void V8Context::terminate_v8()
 {
     if (--instance_count) {
         return;

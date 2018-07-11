@@ -56,12 +56,11 @@ class V8Context {
         int inited;
         void register_functions();
 
-        static void initialize_v8(V8Context* self);
-        static void terminate_v8(V8Context* self);
+        static void initialize_v8();
+        static void terminate_v8();
         static int instance_count;
         static std::unique_ptr<Platform> platform;
 
-        char* program;
         Isolate::CreateParams create_params;
 };
 
