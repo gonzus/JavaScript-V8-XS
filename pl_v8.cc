@@ -318,7 +318,7 @@ SV* pl_get_global_or_property(pTHX_ V8Context* ctx, const char* name)
     SV* ret = &PL_sv_undef; /* return undef by default */
 
     HandleScope handle_scope(ctx->isolate);
-    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
     Context::Scope context_scope(context);
 
     Local<Object> object;
@@ -335,7 +335,7 @@ int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value)
     int ret = 0;
 
     HandleScope handle_scope(ctx->isolate);
-    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
     Context::Scope context_scope(context);
 
     Local<Object> parent;
@@ -355,7 +355,7 @@ SV* pl_exists_global_or_property(pTHX_ V8Context* ctx, const char* name)
     SV* ret = &PL_sv_no; /* return false by default */
 
     HandleScope handle_scope(ctx->isolate);
-    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
     Context::Scope context_scope(context);
 
     Local<Object> object;
@@ -372,7 +372,7 @@ SV* pl_typeof_global_or_property(pTHX_ V8Context* ctx, const char* name)
     const char* cstr = "undefined";
 
     HandleScope handle_scope(ctx->isolate);
-    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
     Context::Scope context_scope(context);
 
     Local<Object> object;
@@ -391,7 +391,7 @@ SV* pl_instanceof_global_or_property(pTHX_ V8Context* ctx, const char* oname, co
     SV* ret = &PL_sv_no; /* return false by default */
 
     HandleScope handle_scope(ctx->isolate);
-    Local<Context> context = Local<Context>::New(ctx->isolate, ctx->persistent_context);
+    Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
     Context::Scope context_scope(context);
 
     Local<Object> oobject;

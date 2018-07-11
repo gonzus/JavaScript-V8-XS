@@ -10,6 +10,8 @@
 #include "pl_stats.h"
 #include "V8Context.h"
 
+#define V8_PROFILE_RESET     0  // set to 1 to profile
+
 #define PROGRAM_NAME         "JavaScript-V8-XS"
 #define ICU_DTL_DATA         "icudtl.dat"
 #define V8_NATIVES_BLOB      "natives_blob.bin"
@@ -26,16 +28,18 @@ int V8Context::instance_count = 0;
 std::unique_ptr<Platform> V8Context::platform = 0;
 
 V8Context::V8Context(HV* opt)
-    : inited(0)
+    : isolate(0),
+      persistent_context(0),
+      persistent_template(0),
+      flags(0),
+      stats(0),
+      msgs(0),
+      pagesize_bytes(0),
+      max_allocated_bytes(0),
+      max_timeout_us(0),
+      inited(0)
 {
     V8Context::initialize_v8();
-
-    // Create a new Isolate and make it the current one.
-    create_params.array_buffer_allocator =
-        ArrayBuffer::Allocator::NewDefaultAllocator();
-    isolate = Isolate::New(create_params);
-
-    ENTER_SCOPE;
 
     pagesize_bytes = total_memory_pages();
     stats = newHV();
@@ -82,25 +86,14 @@ V8Context::V8Context(HV* opt)
         }
     }
 
-    // Create a template for the global object.
-    Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
-
-    // Register some callbacks to native functions
-    pl_register_native_functions(this, object_template);
-    // pl_register_eventloop_functions(this);
-
-    // Register inlined JS code
-    // pl_register_inlined_functions(this);
-
-    // Create a new context.
-    Local<Context> context = Context::New(isolate, 0, object_template);
-    persistent_context.Reset(isolate, context);
-    persistent_template.Reset(isolate, object_template);
+    create_params.array_buffer_allocator =
+        ArrayBuffer::Allocator::NewDefaultAllocator();
+    set_up();
 }
 
 V8Context::~V8Context()
 {
-    isolate->Dispose();
+    tear_down();
     delete create_params.array_buffer_allocator;
 
 #if 0
@@ -115,7 +108,7 @@ V8Context::~V8Context()
 SV* V8Context::get(const char* name)
 {
     ENTER_SCOPE;
-    register_functions();
+    set_up();
 
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
@@ -127,7 +120,7 @@ SV* V8Context::get(const char* name)
 SV* V8Context::exists(const char* name)
 {
     ENTER_SCOPE;
-    register_functions();
+    set_up();
 
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
@@ -139,7 +132,7 @@ SV* V8Context::exists(const char* name)
 SV* V8Context::typeof(const char* name)
 {
     ENTER_SCOPE;
-    register_functions();
+    set_up();
 
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
@@ -151,7 +144,7 @@ SV* V8Context::typeof(const char* name)
 SV* V8Context::instanceof(const char* oname, const char* cname)
 {
     ENTER_SCOPE;
-    register_functions();
+    set_up();
 
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
@@ -163,7 +156,7 @@ SV* V8Context::instanceof(const char* oname, const char* cname)
 void V8Context::set(const char* name, SV* value)
 {
     ENTER_SCOPE;
-    register_functions();
+    set_up();
 
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
@@ -174,7 +167,7 @@ void V8Context::set(const char* name, SV* value)
 SV* V8Context::eval(const char* code, const char* file)
 {
     ENTER_SCOPE;
-    register_functions();
+    set_up();
 
     // performance is tracked inside this call
     return pl_eval(aTHX_ this, code, file);
@@ -183,7 +176,7 @@ SV* V8Context::eval(const char* code, const char* file)
 SV* V8Context::dispatch_function_in_event_loop(const char* func)
 {
     ENTER_SCOPE;
-    register_functions();
+    set_up();
 
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
@@ -195,7 +188,7 @@ SV* V8Context::dispatch_function_in_event_loop(const char* func)
 int V8Context::run_gc()
 {
     ENTER_SCOPE;
-    register_functions();
+    set_up();
 
     Perf perf;
     pl_stats_start(aTHX_ this, &perf);
@@ -224,17 +217,85 @@ void V8Context::reset_msgs()
     msgs = newHV();
 }
 
-void V8Context::register_functions()
+void V8Context::set_up()
 {
-    // TODO: this is here because it cannot be done at construction time
     if (inited) {
         return;
     }
     inited = 1;
+
+#if defined(V8_PROFILE_RESET) && V8_PROFILE_RESET > 0
+    double t0 = now_us();
+#endif
+
+    // Create a new Isolate and make it the current one.
+    isolate = Isolate::New(create_params);
+
+#if defined(V8_PROFILE_RESET) && V8_PROFILE_RESET > 0
+    double t1 = now_us();
+#endif
+
     ENTER_SCOPE;
+
+    // Create the persistent objects that store our context.
+    persistent_context = new Persistent<Context>;
+    persistent_template = new Persistent<ObjectTemplate>;
+
+    // Create a template for the global object.
+    Local<ObjectTemplate> object_template = ObjectTemplate::New(isolate);
+
+    // Register callbacks to native functions in the template
+    pl_register_native_functions(this, object_template);
+
+    // Create a new context and reset the persistent objects.
+    Local<Context> context = Context::New(isolate, 0, object_template);
+    persistent_context->Reset(isolate, context);
+    persistent_template->Reset(isolate, object_template);
+
+    // Register eventloop handlers.
     pl_register_eventloop_functions(this);
+
+    // Register inlined JS code.
     pl_register_inlined_functions(this);
+
+    // Register console handlers.
     pl_register_console_functions(this);
+
+#if defined(V8_PROFILE_RESET) && V8_PROFILE_RESET > 0
+    double t2 = now_us();
+    fprintf(stderr, "SET_UP: %5.0lf + %5.0lf = %5.0lf us\n", t1 - t0, t2 - t1, t2 - t0);
+#endif
+}
+
+void V8Context::tear_down()
+{
+    if (!inited) {
+        return;
+    }
+    inited = 0;
+
+#if defined(V8_PROFILE_RESET) && V8_PROFILE_RESET > 0
+    double t0 = now_us();
+#endif
+
+    delete persistent_template;
+    delete persistent_context;
+    isolate->Dispose();
+
+#if defined(V8_PROFILE_RESET) && V8_PROFILE_RESET > 0
+    double t1 = now_us();
+    fprintf(stderr, "TEAR_DOWN: %5.0lf us\n", t1 - t0);
+#endif
+
+    persistent_template = 0;
+    persistent_context = 0;
+    isolate = 0;
+}
+
+void V8Context::reset()
+{
+    tear_down();
+    set_up();
 }
 
 const char* get_data_path()
