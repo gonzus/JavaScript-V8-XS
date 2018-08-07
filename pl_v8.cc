@@ -116,14 +116,6 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
         Local<External> v8_val = Local<External>::Cast(object->Get(v8_key));
         FuncData* data = (FuncData*) v8_val->Value();
         ret = data->func;
-#if 0
-        /* if the JS function has a slot with the Perl callback, */
-        /* then we know we created it, so we return that */
-        if (duk_get_prop_lstring(ctx, pos, PL_SLOT_GENERIC_CALLBACK, sizeof(PL_SLOT_GENERIC_CALLBACK) - 1)) {
-            ret = (SV*) duk_get_pointer(ctx, pos);
-        }
-        duk_pop(ctx); /* pop function / null pointer */
-#endif
     }
     else if (object->IsArray()) {
         MapJ2P::iterator k = seen.find(object);

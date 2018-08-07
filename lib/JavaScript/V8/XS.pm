@@ -117,7 +117,7 @@ Version 0.000005
         gather_stats     => 1,
         save_messages    => 1,
     };
-    my $vm = JavaScript::Duktape::XS->new($options);
+    my $vm = JavaScript::V8::XS->new($options);
 
     $vm->set('global_name', [1, 2, 3]);
     my $aref = $vm->get('global_name');
