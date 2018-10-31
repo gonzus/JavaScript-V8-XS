@@ -252,9 +252,9 @@ number of rounds that were effectively run.
 
 =over 4
 
-=item * L<< https://metacpan.org/pod/JavaScript::V8 >>
+=item * L<JavaScript::V8>
 
-=item * L<< https://metacpan.org/pod/JavaScript::Duktape::XS >>
+=item * L<JavaScript::Duktape::XS>
 
 =back
 
