@@ -127,7 +127,9 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
         Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
         Local<External> v8_val = Local<External>::Cast(object->Get(v8_key));
         FuncData* data = (FuncData*) v8_val->Value();
-        ret = data->func;
+        if (data && data->func) {
+            ret = data->func;
+        }
     }
     else if (object->IsArray()) {
         MapJ2P::iterator k = seen.find(object);
