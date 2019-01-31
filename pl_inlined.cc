@@ -1,5 +1,6 @@
 #include "pl_eval.h"
 #include "pl_inlined.h"
+#include "ppport.h"
 
 typedef int (*BeforeCB)(V8Context* ctx);
 
