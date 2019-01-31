@@ -53,3 +53,4 @@ t/17_remove.t
 t/18_boolean.t
 t/19_blessed.t
 t/20_references.t
+t/21_this_bug.t
