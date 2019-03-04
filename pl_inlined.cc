@@ -107,6 +107,29 @@ static struct {
         "}\n"
         "\n"
     },
+
+    {
+        "log_cyclic.js",
+
+        "function JSON_stringify_with_cycles(obj) {\n"
+        "  function getCircularReplacer() {\n"
+        "    const seen = new WeakMap();\n"
+        "    let count = 0;\n"
+        "    return (key, value) => {\n"
+        "      if (typeof value === \"object\" && value !== null) {\n"
+        "        if (seen.has(value)) {\n"
+        "          return \"<cycle\" + seen.get(value) + \">\";\n"
+        "        }\n"
+        "        seen.set(value, count++);\n"
+        "      }\n"
+        "      return value;\n"
+        "    };\n"
+        "  };\n"
+        "\n"
+        "  return JSON.stringify(obj, getCircularReplacer());\n"
+        "};\n"
+        "\n"
+    },
 };
 
 void pl_register_inlined_functions(V8Context* ctx)

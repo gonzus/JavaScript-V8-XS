@@ -83,24 +83,38 @@ static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int 
         sv_catpvf(aTHX_ message, ":");
         separate = true;
     }
-    for (int j = start; j < args.Length(); j++) {
-        /* add separator if necessary */
-        if (separate) {
-            sv_catpvf(aTHX_ message, " ");
-        }
-        separate = true;
-        /* for non-objects, just get their value as string */
-        if (!args[j]->IsObject()) {
-            String::Utf8Value str(isolate, args[j]);
+
+    Local<Object> global = context->Global();
+    Local<Name> to_str_nam = String::NewFromUtf8(isolate, "JSON_stringify_with_cycles", NewStringType::kNormal).ToLocalChecked();
+    Local<Value> to_str_val = global->Get(to_str_nam);
+    if (to_str_val->IsFunction()) {
+        Local<Function> to_str_fun = Local<Function>::Cast(to_str_val);
+        Local<Value> sargs[1];
+        for (int j = start; j < args.Length(); j++) {
+            /* add separator if necessary */
+            if (separate) {
+                sv_catpvf(aTHX_ message, " ");
+            }
+            separate = true;
+
+            /* for non-objects, just get their value as string */
+            if (!args[j]->IsObject()) {
+                String::Utf8Value str(isolate, args[j]);
+                sv_catpvf(aTHX_ message, "%s", *str);
+                continue;
+            }
+
+            /* convert each object arg to JSON */
+            sargs[0] = args[j];
+            Local<Value> ret;
+            if (!to_str_fun->Call(context, global, 1, sargs).ToLocal(&ret)) {
+                continue;
+            }
+            Local<String> json = Local<String>::Cast(ret);
+            String::Utf8Value str(isolate, json);
             sv_catpvf(aTHX_ message, "%s", *str);
-            continue;
         }
-        /* convert objects to JSON */
-        Local<String> json = JSON::Stringify(context, args[j]).ToLocalChecked();
-        String::Utf8Value str(isolate, json);
-        sv_catpvf(aTHX_ message, "%s", *str);
     }
-    sv_catpvf(aTHX_ message, "\n");
     if (stack) {
 #if 0
         /* TODO: generate a stack trace */
