@@ -2,6 +2,7 @@ use 5.008009;
 use ExtUtils::MakeMaker;
 
 my @V8_CC_OPTS;
+my @V8_WARNINGS;
 my @V8_INCS;
 my @V8_LIBS;
 
@@ -21,9 +22,9 @@ my $CC = 'c++';
 my $LD = 'c++';
 
 my $CC_OPTS = join(' ',
-    @V8_CC_OPTS,
-    map { "-W$_" } @V8_WARNINGS,
-    map { "-I$_" } @V8_INCS,
+    (@V8_CC_OPTS),
+    (map { "-W$_" } @V8_WARNINGS),
+    (map { "-I$_" } @V8_INCS),
 );
 my $LD_OPTS = join(' ',
     map { "-l$_" } @V8_LIBS,
