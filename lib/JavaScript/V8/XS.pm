@@ -94,6 +94,8 @@ Version 0.000013
 
     my $rounds = $vm->run_gc();
 
+    my $info = $vm->get_version_info();
+
 =head1 DESCRIPTION
 
 This module provides an XS wrapper to call V8 from Perl.
@@ -247,6 +249,10 @@ will appear first in the returned stacktrace information.
 
 Run at least one round of the JavaScript garbage collector, and return the
 number of rounds that were effectively run.
+
+=head2 get_version_info
+
+Return a hashref with version information.
 
 =head1 SEE ALSO
 

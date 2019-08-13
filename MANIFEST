@@ -56,3 +56,4 @@ t/20_references.t
 t/21_this_bug.t
 t/22_overflow.t
 t/23_dualvar.t
+t/24_version.t
