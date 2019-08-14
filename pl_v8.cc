@@ -112,17 +112,20 @@ static void perl_caller(const FunctionCallbackInfo<Value>& args)
 static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object, MapJ2P& seen)
 {
     SV* ret = &PL_sv_undef; /* return undef by default */
+    Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
     if (object->IsUndefined()) {
     }
     else if (object->IsNull()) {
     }
     else if (object->IsBoolean()) {
-        bool val = object->BooleanValue();
+        Local<Boolean> v8_val = Local<Boolean>::Cast(object);
+        bool val = v8_val->Value();
         ret = get_sv(val ? PL_JSON_BOOLEAN_TRUE : PL_JSON_BOOLEAN_FALSE, 0);
         SvREFCNT_inc(ret);
     }
     else if (object->IsNumber()) {
-        double val = object->NumberValue();
+        Local<Number> v8_val = Local<Number>::Cast(object);
+        double val = v8_val->Value();
         ret = newSVnv(val);  /* JS numbers are always doubles */
     }
     else if (object->IsString()) {
@@ -132,10 +135,13 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
     }
     else if (object->IsFunction()) {
         Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
-        Local<External> v8_val = Local<External>::Cast(object->Get(v8_key));
-        FuncData* data = (FuncData*) v8_val->Value();
-        if (data && data->func) {
-            ret = data->func;
+        Local<Value> key_val;
+        if (object->Get(context, v8_key).ToLocal(&key_val)) {
+            Local<External> v8_val = Local<External>::Cast(key_val);
+            FuncData* data = (FuncData*) v8_val->Value();
+            if (data && data->func) {
+                ret = data->func;
+            }
         }
     }
     else if (object->IsArray()) {
@@ -153,8 +159,10 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
             Local<Array> array = Local<Array>::Cast(object);
             int array_top = array->Length();
             for (int j = 0; j < array_top; ++j) {
-                Local<Value> value = array->Get(j);
-                /* TODO: check we got a valid value */
+                Local<Value> value;
+                if (!array->Get(context, j).ToLocal(&value)) {
+                    croak("Could not get array element\n");
+                }
                 Local<Object> elem = Local<Object>::Cast(value);
                 /* TODO: check we got a valid element */
 
@@ -180,15 +188,19 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
             ret = newRV_inc(values);
             seen[object] = values;
 
-            Local<Array> property_names = object->GetOwnPropertyNames();
+            Local<Array> property_names = object->GetOwnPropertyNames(context).ToLocalChecked();
             int hash_top = property_names->Length();
             for (int j = 0; j < hash_top; ++j) {
-                Local<Value> v8_key = property_names->Get(j);
-                /* TODO: check we got a valid key */
+                Local<Value> v8_key;
+                if (!property_names->Get(context, j).ToLocal(&v8_key)) {
+                    croak("Could not get object key\n");
+                }
 
-                String::Utf8Value key(ctx->isolate, v8_key->ToString());
-                Local<Value> value = object->Get(v8_key);
-                /* TODO: check we got a valid value */
+                String::Utf8Value key(ctx->isolate, v8_key->ToString(context).ToLocalChecked());
+                Local<Value> value;
+                if (!object->Get(context, v8_key).ToLocal(&value)) {
+                    croak("Could not get object value key\n");
+                }
 
                 Local<Object> obj = Local<Object>::Cast(value);
                 /* TODO: check we got a valid object */
@@ -215,6 +227,7 @@ static SV* pl_v8_to_perl_impl(pTHX_ V8Context* ctx, const Local<Object>& object,
 
 static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, MapP2J& seen, int ref)
 {
+    Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
     Local<Object> ret = Local<Object>::Cast(Null(ctx->isolate));
     if (SvTYPE(value) >= SVt_PVMG) {
         /*
@@ -265,7 +278,9 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, M
                     const Local<Object> nested = pl_perl_to_v8_impl(aTHX_ *elem, ctx, seen, 0);
                     /* TODO: check for validity */
                     /*  croak("Could not create JS element for array\n"); */
-                    array->Set(j, nested);
+                    if (!array->Set(context, j, nested).IsJust()) {
+                        croak("Could not set JS element for array\n");
+                    }
                 }
             }
         } else if (type == SVt_PVHV) {
@@ -309,7 +324,9 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, M
                     /*  croak("Could not create JS element for hash\n"); */
 
                     Local<Value> v8_key = String::NewFromUtf8(ctx->isolate, kstr, NewStringType::kNormal).ToLocalChecked();
-                    object->Set(v8_key, nested);
+                    if (!object->Set(context, v8_key, nested).IsJust()) {
+                        croak("Could not create JS element for hash\n");
+                    }
                 }
             }
         } else if (type == SVt_PVCV) {
@@ -317,8 +334,10 @@ static const Local<Object> pl_perl_to_v8_impl(pTHX_ SV* value, V8Context* ctx, M
             Local<Value> val = External::New(ctx->isolate, data);
             Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, perl_caller, val);
             Local<Name> v8_key = String::NewFromUtf8(ctx->isolate, "__perl_callback", NewStringType::kNormal).ToLocalChecked();
-            Local<Function> v8_func = ft->GetFunction();
-            v8_func->Set(v8_key, val);
+            Local<Function> v8_func = ft->GetFunction(context).ToLocalChecked();
+            if (!v8_func->Set(context, v8_key, val).IsJust()) {
+                croak("Could not set JS function pointer");
+            }
             ret = Local<Object>::Cast(v8_func);
         } else {
             croak("Don't know how to deal with an undetermined Perl reference\n");
@@ -373,7 +392,9 @@ int pl_set_global_or_property(pTHX_ V8Context* ctx, const char* name, SV* value)
     bool found = find_parent(ctx, name, context, parent, slot);
     if (found) {
         Local<Object> object = pl_perl_to_v8(aTHX_ value, ctx);
-        parent->Set(slot, object);
+        if (!parent->Set(context, slot, object).IsJust()) {
+            croak("could not set global or property");
+        }
         ret = 1;
     }
 
@@ -392,8 +413,8 @@ int pl_del_global_or_property(pTHX_ V8Context* ctx, const char* name)
     Local<Value> slot;
     bool found = find_parent(ctx, name, context, parent, slot);
     if (found) {
-        parent->Delete(slot);
-        ret = 1;
+        bool did = parent->Delete(context, slot).ToChecked();
+        ret = did;
     }
 
     return ret;
@@ -466,13 +487,15 @@ SV* pl_global_objects(pTHX_ V8Context* ctx)
     Context::Scope context_scope(context);
 
     Local<Object> global = context->Global();
-    Local<Array> property_names = global->GetOwnPropertyNames();
+    Local<Array> property_names = global->GetOwnPropertyNames(context).ToLocalChecked();
     int count = 0;
     AV* values = newAV();
     for (uint32_t j = 0; j < property_names->Length(); ++j) {
-        Local<Value> v8_key = property_names->Get(j);
-        /* TODO: check we got a valid key */
-        String::Utf8Value key(ctx->isolate, v8_key->ToString());
+        Local<Value> v8_key;
+        if (!property_names->Get(context, j).ToLocal(&v8_key)) {
+            croak("could not get name of global object");
+        }
+        String::Utf8Value key(ctx->isolate, v8_key->ToString(context).ToLocalChecked());
         SV* name = sv_2mortal(newSVpvn(*key, key.length()));
         if (av_store(values, count, name)) {
             SvREFCNT_inc(name);
@@ -512,9 +535,11 @@ bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Loca
             break;
         }
         Local<Value> child;
-        if (parent->Has(slot)) {
+        if (parent->Has(context, slot).ToChecked()) {
             /* parent has a slot with that name */
-            child = parent->Get(slot);
+            if (!parent->Get(context, slot).ToLocal(&child)) {
+                croak("could not get parent slot");
+            }
         }
         else if (!create) {
             /* we must not create the missing slot, we are done */
@@ -523,7 +548,9 @@ bool find_parent(V8Context* ctx, const char* name, Local<Context>& context, Loca
         else {
             /* create the missing slot and go on */
             child = Object::New(ctx->isolate);
-            parent->Set(slot, child);
+            if (!parent->Set(context, slot, child).IsJust()) {
+                croak("could not set parent slot");
+            }
         }
         parent = Local<Object>::Cast(child);
         if (!child->IsObject()) {
@@ -544,11 +571,15 @@ bool find_object(V8Context* ctx, const char* name, Local<Context>& context, Loca
         /* could not find parent */
         return false;
     }
-    if (!parent->Has(slot)) {
+    if (!parent->Has(context, slot).ToChecked()) {
         /* parent doesn't have a slot with that name */
         return false;
     }
-    Local<Value> child = parent->Get(slot);
+    Local<Value> child;
+    if (!parent->Get(context, slot).ToLocal(&child)) {
+        croak("could not get object slot");
+        return false;
+    }
     object = Local<Object>::Cast(child);
     return true;
 }

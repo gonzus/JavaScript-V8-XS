@@ -84,7 +84,10 @@ static int console_output(const FunctionCallbackInfo<Value>& args, unsigned int 
 
     Local<Object> global = context->Global();
     Local<Name> to_str_nam = String::NewFromUtf8(isolate, "JSON_stringify_with_cycles", NewStringType::kNormal).ToLocalChecked();
-    Local<Value> to_str_val = global->Get(to_str_nam);
+    Local<Value> to_str_val;
+    if (!global->Get(context, to_str_nam).ToLocal(&to_str_val)) {
+        return 0;
+    }
     if (to_str_val->IsFunction()) {
         Local<Function> to_str_fun = Local<Function>::Cast(to_str_val);
         Local<Value> sargs[1];
@@ -129,7 +132,8 @@ static void console_assert(const FunctionCallbackInfo<Value>& args)
     if (args.Length() < 1) {
         return;
     }
-    bool silent = args[0]->BooleanValue();
+    Local<Boolean> v8_silent = Local<Boolean>::Cast(args[0]);
+    bool silent = v8_silent->Value();
     if (silent) {
         return;
     }
@@ -198,6 +202,7 @@ int pl_register_console_functions(V8Context* ctx)
     Context::Scope context_scope(context);
     Local<Value> v8_ctx = External::New(ctx->isolate, ctx);
     int n = sizeof(data) / sizeof(data[0]);
+    int c = 0;
     for (int j = 0; j < n; ++j) {
         Local<Object> object;
         Local<Value> slot;
@@ -207,10 +212,13 @@ int pl_register_console_functions(V8Context* ctx)
             continue;
         }
         Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, data[j].func, v8_ctx);
-        Local<Function> v8_func = ft->GetFunction();
-        object->Set(slot, v8_func);
+        Local<Function> v8_func = ft->GetFunction(context).ToLocalChecked();
+        if (!object->Set(context, slot, v8_func).IsNothing()) {
+            continue;
+        }
+        ++c;
     }
-    return n;
+    return c;
 }
 
 int pl_show_error(V8Context* ctx, const char* fmt, ...)

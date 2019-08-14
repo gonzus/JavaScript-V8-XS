@@ -235,14 +235,14 @@ static void create_timer(const FunctionCallbackInfo<Value>& args)
 
     HandleScope handle_scope(args.GetIsolate());
     Local<Function> v8_func    = Local<Function>::Cast(args[0]);
-    Local<Value>    v8_delay   = Local<Value>::Cast(args[1]);
-    Local<Value>    v8_oneshot = Local<Value>::Cast(args[2]);
+    Local<Number>   v8_delay   = Local<Number>::Cast(args[1]);
+    Local<Boolean>  v8_oneshot = Local<Boolean>::Cast(args[2]);
 
-    double delay = v8_delay->NumberValue();
+    double delay = v8_delay->Value();
     if (delay < MIN_DELAY) {
         delay = MIN_DELAY;
     }
-    bool oneshot =  v8_oneshot->BooleanValue();
+    bool oneshot = v8_oneshot->Value();
 
     int idx = timer_count++;
     int64_t timer_id = timer_next_id++;
@@ -282,9 +282,8 @@ static void delete_timer(const FunctionCallbackInfo<Value>& args)
     }
 
     HandleScope handle_scope(args.GetIsolate());
-    Local<Value>    v8_timer_id = Local<Value>::Cast(args[0]);
-
-    int64_t  timer_id = v8_timer_id->NumberValue();
+    Local<Number> v8_timer_id = Local<Number>::Cast(args[0]);
+    int64_t timer_id = v8_timer_id->Value();
 
     /*
      *  Unlike insertion, deletion needs a full scan of the timer list
@@ -362,6 +361,7 @@ int pl_register_eventloop_functions(V8Context* ctx)
     Local<Context> context = Local<Context>::New(ctx->isolate, *ctx->persistent_context);
     Context::Scope context_scope(context);
     int n = sizeof(data) / sizeof(data[0]);
+    int c = 0;
     for (int j = 0; j < n; ++j) {
         Local<Object> object;
         Local<Value> slot;
@@ -372,10 +372,13 @@ int pl_register_eventloop_functions(V8Context* ctx)
         }
         Local<Value> v8_val = External::New(ctx->isolate, ctx);
         Local<FunctionTemplate> ft = FunctionTemplate::New(ctx->isolate, data[j].func, v8_val);
-        Local<Function> v8_func = ft->GetFunction();
-        object->Set(slot, v8_func);
+        Local<Function> v8_func = ft->GetFunction(context).ToLocalChecked();
+        if (!object->Set(context, slot, v8_func).IsNothing()) {
+            continue;
+        }
+        ++c;
     }
-    return n;
+    return c;
 }
 
 SV* pl_run_function_in_event_loop(pTHX_ V8Context* ctx, const char* func)

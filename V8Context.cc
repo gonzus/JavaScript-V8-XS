@@ -1,6 +1,6 @@
 #include <unistd.h>
 #include <v8-version.h>
-#include "libplatform/libplatform.h"
+#include <libplatform/libplatform.h>
 #include "pl_util.h"
 #include "pl_v8.h"
 #include "pl_eval.h"
@@ -27,7 +27,7 @@
     HandleScope handle_scope(isolate)
 
 int V8Context::instance_count = 0;
-std::unique_ptr<Platform> V8Context::platform = 0;
+std::unique_ptr<v8::Platform> V8Context::platform = 0;
 
 V8Context::V8Context(HV* opt)
     : isolate(0),
@@ -391,7 +391,7 @@ void V8Context::initialize_v8()
     sprintf(snapshot_blob, "%s/%s", data_path, V8_SNAPSHOT_BLOB);
     V8::InitializeExternalStartupData(natives_blob, snapshot_blob);
 
-    platform = platform::NewDefaultPlatform();
+    platform = v8::platform::NewDefaultPlatform();
     V8::InitializePlatform(platform.get());
     V8::Initialize();
 }
