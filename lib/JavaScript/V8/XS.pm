@@ -7,7 +7,7 @@ use JSON::PP;
 use Text::Trim qw(trim rtrim);
 use XSLoader;
 
-our $VERSION = '0.000013';
+our $VERSION = '0.000014';
 XSLoader::load( __PACKAGE__, $VERSION );
 
 our @EXPORT_OK = qw[];
@@ -49,7 +49,7 @@ JavaScript::V8::XS - Perl XS binding for the V8 Javascript embeddable engine
 
 =head1 VERSION
 
-Version 0.000013
+Version 0.000014
 
 =head1 SYNOPSIS
 
