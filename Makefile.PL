@@ -11,58 +11,17 @@ my @V8_CC_INCS;
 my @V8_LD_OPTS;
 my @V8_LD_LIBS;
 
-# MISSING?
-#
-# CR_XCODE_VERSION=1030
-# CR_CLANG_REVISION=\"365097-f7e52fbd-8\"
-# __STDC_CONSTANT_MACROS
-# __STDC_FORMAT_MACROS
-# COMPONENT_BUILD
-# __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORE=0
-# ENABLE_GDB_JIT_INTERFACE
-# V8_WIN64_UNWINDING_INFO
-
-# these apply always
-push @V8_CC_DEFS, qw<
-    _FORTIFY_SOURCE=2
-
-    _LIBCPP_HAS_NO_ALIGNED_ALLOCATION
-
-    NDEBUG
-    NVALGRIND
-    UCHAR_TYPE=uint16_t
-
-    V8_DEPRECATION_WARNINGS
-    V8_IMMINENT_DEPRECATION_WARNINGS
-
-    DISABLE_UNTRUSTED_CODE_MITIGATIONS
-    DYNAMIC_ANNOTATIONS_ENABLED=0
-    ENABLE_MINOR_MC
-
-    USING_V8_BASE_SHARED
-    USING_V8_PLATFORM_SHARED
-    USING_V8_SHARED
-    V8_CONCURRENT_MARKING
-    V8_EMBEDDED_BUILTINS
-    V8_INTL_SUPPORT
-    V8_TARGET_ARCH_X64
-    V8_TYPED_ARRAY_MAX_SIZE_IN_HEAP=64
-    V8_USE_EXTERNAL_STARTUP_DATA
-    V8_USE_SNAPSHOT
-
-    ICU_UTIL_DATA_IMPL=ICU_UTIL_DATA_FILE
-    USE_CHROMIUM_ICU=1
-    U_USING_ICU_NAMESPACE=0
-    U_ENABLE_DYLOAD=0
->;
 push @V8_CC_OPTS, qw< -O2 -std=c++14 >;
 push @V8_CC_WRNS, qw< all extra no-unused-parameter >;
 push @V8_LD_LIBS, qw< v8 v8_libbase v8_libplatform icuuc icui18n >;
 
 if ($^O eq 'linux') {
-    # these apply only on linux, where the V8 build required to ignore standard
-    # include files and instead look at their own internal libc++ files
     push @V8_CC_DEFS, qw< PERL_JAVASCRIPT_V8_XS_LINUX >;
+
+    # these apply only on linux, where the V8 build has to ignore standard
+    # include files and instead looks at its own internal libc++ files
+    # TODO: double-check this is still needed
+    # TODO: figure out a better place to install includes / libraries / blobs
     push @V8_CC_OPTS, qw< -nostdinc++ >;
     push @V8_CC_INCS, map { "/usr/include/$_/include" } qw< v8/libc++ v8/libc++abi >;
 }
