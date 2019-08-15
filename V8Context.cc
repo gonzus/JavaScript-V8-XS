@@ -337,9 +337,15 @@ void V8Context::reset()
 const char* get_data_path()
 {
     static const char* locations[] = {
+#if defined(V8_DATA_DIR)
+#define QUOTE(name) #name
+#define QUOTE_MACRO(name) QUOTE(name)
+#define QUOTED_V8_DATA_DIR QUOTE_MACRO(V8_DATA_DIR)
+        QUOTED_V8_DATA_DIR,
+#endif
+        "/usr/local/lib",
         "/usr/lib64",
         "/usr/lib",
-        "/usr/local/lib",
     };
     static const char* files[] = {
         ICU_DTL_DATA,
@@ -359,7 +365,7 @@ const char* get_data_path()
             }
             ++found;
         }
-        if (found < num_locations) {
+        if (found < num_files) {
             continue;
         }
         /* found all required files -- yipee! */
