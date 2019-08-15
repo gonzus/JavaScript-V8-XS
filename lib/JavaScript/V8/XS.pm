@@ -7,7 +7,7 @@ use JSON::PP;
 use Text::Trim qw(trim rtrim);
 use XSLoader;
 
-our $VERSION = '0.000014';
+our $VERSION = '0.000015';
 XSLoader::load( __PACKAGE__, $VERSION );
 
 our @EXPORT_OK = qw[];
@@ -49,7 +49,7 @@ JavaScript::V8::XS - Perl XS binding for the V8 Javascript embeddable engine
 
 =head1 VERSION
 
-Version 0.000014
+Version 0.000015
 
 =head1 SYNOPSIS
 
@@ -105,21 +105,23 @@ C<JavaScript::V8::XS> and then invoke functions on it.
 
 =head1 DEPENDENCIES
 
-This module requires that recent versions of the V8 and ICU libraries have
-already been installed in your system.
+This module requires a recent version of the V8 library (and related libraries
+and assets) already installed in your system.
 
-At the time of writing, versions used were V8 6.7 and ICU 61.
+The current version of the module has been tested to work against V8 versions
+6.x (6.7.288.46) and 7.x (7.6.303.29).
 
 The module does not attempt to download / install these required external
-dependencies:
+dependencies, and you have to take care that they are available prior to using
+the module:
 
 =over 4
 
-=item * header files
+=item * header files (for V8 and ICU)
 
-=item * shared libraries
+=item * shared libraries (for V8 and ICU)
 
-=item * V8 blobs, usually generated at compilation time (C<natives_blob.bin>
+=item * V8 blobs, usually generated at V8 compilation time (C<natives_blob.bin>
 and C<snapshot_blob.bin>)
 
 =item * ICU data files (C<icudtl.dat>)
