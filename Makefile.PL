@@ -48,19 +48,23 @@ my $V8_DATA_DIR    = $ENV{V8_DATA_DIR}    // join('/', $V8_BASE_DIR, $V8_DATA);
 
 push @V8_CC_INCD, $V8_INCLUDE_DIR;
 push @V8_LD_LIBD, $V8_LIB_DIR;
-push @V8_CC_DEFS, sprintf('%s="%s"', 'V8_DATA_DIR', $V8_DATA_DIR);
 
 push @V8_CC_OPTS, qw< -O2 -std=c++14 >;
 push @V8_CC_WRNS, qw< all extra no-unused-parameter >;
 push @V8_LD_LIBN, qw< v8 v8_libbase v8_libplatform icuuc icui18n >;
+
+push @V8_CC_DEFS, join('=', 'V8_DATA_DIR', $V8_DATA_DIR);
 
 if ($^O eq 'linux') {
     push @V8_CC_DEFS, qw< PERL_JAVASCRIPT_V8_XS_LINUX >;
 
     # these apply only on linux, where the V8 build has to ignore standard
     # include files and instead looks at its own internal libc++ files
-    # TODO: double-check this is still needed
     push @V8_CC_OPTS, qw< -nostdinc++ >;
+    push @V8_CC_INCD, map { "$V8_INCLUDE_DIR/$_/include" } qw< libc++ libc++abi >;
+    push @V8_CC_DEFS, qw< _LIBCPP_ABI_UNSTABLE >;
+    push @V8_CC_DEFS, join('=', '_LIBCPP_ABI_VERSION', 'Cr');
+
 }
 
 if ($^O eq 'darwin') {
