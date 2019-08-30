@@ -3,6 +3,8 @@ use warnings;
 use 5.008009;
 
 use ExtUtils::MakeMaker;
+use Path::Tiny;
+use JSON::XS;
 
 my @V8_CC_OPTS;
 my @V8_CC_DEFS;
@@ -14,7 +16,7 @@ my @V8_LD_LIBD;
 
 # These defaults assume that you have installed the relevant version X of V8
 # under /opt/V8/X, where you have directories include, lib and data.
-my $V8_DEFAULT_VERSION  = 6;
+my $V8_DEFAULT_VERSION  = 7;
 my $V8_DEFAULT_ROOT_DIR = '/opt/V8';
 my $V8_DEFAULT_INCLUDE  = 'include';
 my $V8_DEFAULT_LIB      = 'lib';
@@ -22,15 +24,21 @@ my $V8_DEFAULT_DATA     = 'data';
 
 # Examples for changing the V8 configuration:
 #
-#   V8_VERSION=6 perl Makefile.PL                # use V8 version 6 from /opt/V8/6/...
-#   V8_ROOT_DIR=/usr/local/V8 perl Makefile.PL   # use V8 version 6 from /usr/local/V8/7...
+#   V8_VERSION=7 perl Makefile.PL                # use V8 version 7 from /opt/V8/7/...
+#   V8_ROOT_DIR=/usr/local/V8 perl Makefile.PL   # use V8 version 7 from /usr/local/V8/7...
 #   V8_DATA_DIR=/tmp/blobs perl Makefile.PL      # use defaults but get V8 data blobs from /tmp/blobs
 
-my $V8_VERSION  = $ENV{V8_VERSION}  // $V8_DEFAULT_VERSION;
-my $V8_ROOT_DIR = $ENV{V8_ROOT_DIR} // $V8_DEFAULT_ROOT_DIR;
-my $V8_INCLUDE  = $ENV{V8_INCLUDE}  // $V8_DEFAULT_INCLUDE;
-my $V8_LIB      = $ENV{V8_LIB}      // $V8_DEFAULT_LIB;
-my $V8_DATA     = $ENV{V8_DATA}     // $V8_DEFAULT_DATA;
+my %config;
+my $path = path('./config.json');
+if ($path && $path->is_file()) {
+    my $data = JSON::XS->new->relaxed->decode($path->slurp());
+    %config = %$data if $data;
+}
+my $V8_VERSION  = $ENV{V8_VERSION}  // $config{V8_VERSION}  // $V8_DEFAULT_VERSION;
+my $V8_ROOT_DIR = $ENV{V8_ROOT_DIR} // $config{V8_ROOT_DIR} // $V8_DEFAULT_ROOT_DIR;
+my $V8_INCLUDE  = $ENV{V8_INCLUDE}  // $config{V8_INCLUDE}  // $V8_DEFAULT_INCLUDE;
+my $V8_LIB      = $ENV{V8_LIB}      // $config{V8_LIB}      // $V8_DEFAULT_LIB;
+my $V8_DATA     = $ENV{V8_DATA}     // $config{V8_DATA}     // $V8_DEFAULT_DATA;
 
 my $V8_BASE_DIR = $ENV{V8_BASE_DIR} // join('/', $V8_ROOT_DIR, $V8_VERSION);
 
