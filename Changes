@@ -1,3 +1,8 @@
+0.000016    2019-09-02
+            * Update Makefile.PL to work on Linux and Mac
+            * Allow reading V8 config from a json file (default: version 6)
+            * Allow specifying version / location of V8 files
+
 0.000015    2019-08-15
             * Code and Makefile.PL changes for V8, including making the same
               code compile against V8 6.x and 7.x
